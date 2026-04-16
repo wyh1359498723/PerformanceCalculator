@@ -1,0 +1,118 @@
+<Window x:Class="PerformanceCalculator2.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:oxy="http://oxyplot.org/wpf"
+        xmlns:local="clr-namespace:PerformanceCalculator2"
+        mc:Ignorable="d"
+        Title="绩效统计" Height="780" Width="1200" MinWidth="1200" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI" FontSize="13">
+  <DockPanel x:Name="RootDock">
+    <Border x:Name="PanelTop" DockPanel.Dock="Top" Padding="8" SnapsToDevicePixels="True">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Margin="0,0,0,6">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock x:Name="LblPath" Grid.Column="0" VerticalAlignment="Center" Text="尚未加载文件" TextWrapping="Wrap"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="BtnExportOperatorChart" Content="导出操作员图…" MinWidth="128" Height="32" Margin="0,0,8,0" Click="BtnExportOperatorChart_Click"/>
+            <Button x:Name="BtnExportMonthChart" Content="导出月度图…" MinWidth="128" Height="32" Margin="0,0,8,0" Click="BtnExportMonthChart_Click"/>
+            <CheckBox x:Name="ChkDarkMode" Content="深色模式" VerticalAlignment="Center" Margin="0,0,8,0" Checked="ChkDarkMode_Changed" Unchecked="ChkDarkMode_Changed"/>
+            <Button x:Name="BtnSelectFiles" Content="选择 Excel…" MinWidth="130" Height="32" Click="BtnSelectFiles_Click"/>
+          </StackPanel>
+        </Grid>
+
+        <Border x:Name="PanelDrop" Grid.Row="1" Height="38" BorderThickness="1" CornerRadius="2"
+                AllowDrop="True" PreviewDragOver="PanelDrop_PreviewDragOver" DragLeave="PanelDrop_DragLeave"
+                Drop="PanelDrop_Drop" PreviewDragEnter="PanelDrop_PreviewDragEnter">
+          <TextBlock x:Name="LblDropHint" Text="将 .xlsx 文件拖放到此处，或点击「选择 Excel」" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+
+        <Border x:Name="PanelImportProgress" Grid.Row="2" Visibility="Collapsed" Margin="0,6,0,0" Padding="4,0,4,2">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="LblImportDetail" Grid.Row="0" Margin="0,2"/>
+            <ProgressBar x:Name="ProgressImport" Grid.Row="1" Height="18" Minimum="0" Maximum="100" Value="0"/>
+          </Grid>
+        </Border>
+      </Grid>
+    </Border>
+
+    <Grid x:Name="MainGrid" Margin="8">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <Grid Grid.Column="0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border x:Name="PanelPerf" Grid.Row="0" Margin="0,0,0,8" Padding="0,4,0,4">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="140"/>
+            </Grid.RowDefinitions>
+
+            <WrapPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock Text="绩效表月份：" VerticalAlignment="Center" Margin="0,4,4,0"/>
+              <ComboBox x:Name="CboPerfMonth" Width="120" Margin="0,0,12,0" VerticalAlignment="Center"
+                        SelectionChanged="CboPerfMonth_SelectionChanged"/>
+              <TextBlock x:Name="LblAvgEffective" Text="平均有效工时：—" VerticalAlignment="Center" Margin="0,4,12,0" MinWidth="220"/>
+              <CheckBox x:Name="ChkBelowAvg" Content="低于平均有效工时" VerticalAlignment="Center" Margin="0,0,12,0"
+                        Checked="ChkBelowAvg_Changed" Unchecked="ChkBelowAvg_Changed"/>
+              <Button x:Name="BtnHistory" Content="历史数据…" Padding="10,4" Click="BtnHistory_Click"/>
+            </WrapPanel>
+
+            <TextBlock Grid.Row="1" Text="图表统计月份（含历史，默认全选）：" VerticalAlignment="Center" Margin="0,4,0,4"/>
+
+            <Border Grid.Row="2" BorderThickness="1" CornerRadius="2" Padding="4">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="ChartMonthItemsControl">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:SelectableMonth}">
+                      <CheckBox Margin="0,2" Content="{Binding MonthKey}" IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                Checked="ChartMonthCheck_Changed" Unchecked="ChartMonthCheck_Changed"/>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Border>
+          </Grid>
+        </Border>
+
+        <DataGrid x:Name="DgvOperators" Grid.Row="1" Margin="0,0,0,8" IsReadOnly="True" AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" HeadersVisibility="Column"/>
+        <DataGrid x:Name="DgvMonths" Grid.Row="2" IsReadOnly="True" AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" HeadersVisibility="Column"/>
+      </Grid>
+
+      <Grid Grid.Column="1" Margin="8,0,0,0">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <local:OperatorOeeControl x:Name="OperatorOeeChart" Grid.Row="0" Margin="0,0,0,8"/>
+        <oxy:PlotView x:Name="PlotMonth" Grid.Row="1"/>
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>
