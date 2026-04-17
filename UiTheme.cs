@@ -117,6 +117,33 @@ internal sealed class UiTheme
         Color.FromRgb(56, 189, 248),
         Color.FromRgb(191, 219, 254));
 
+    /// <summary>科幻深色：霓虹青主色、深空背景、高对比图表。</summary>
+    public static UiTheme Tech { get; } = new UiTheme(
+        Color.FromRgb(8, 12, 22),
+        Color.FromRgb(12, 18, 35),
+        Color.FromRgb(34, 211, 238),
+        Color.FromRgb(226, 245, 255),
+        Color.FromRgb(125, 155, 175),
+        Color.FromRgb(22, 36, 58),
+        Color.FromRgb(12, 20, 36),
+        Color.FromRgb(40, 62, 88),
+        Color.FromRgb(10, 18, 34),
+        Color.FromRgb(34, 211, 238),
+        Color.FromRgb(8, 12, 22),
+        Color.FromRgb(14, 24, 42),
+        Color.FromRgb(18, 32, 52),
+        Color.FromRgb(8, 14, 28),
+        Color.FromRgb(30, 48, 72),
+        Color.FromRgb(20, 34, 54),
+        Color.FromRgb(160, 210, 230),
+        Color.FromRgb(226, 245, 255),
+        Color.FromRgb(190, 230, 255),
+        Color.FromRgb(34, 211, 238),
+        Color.FromRgb(167, 139, 250),
+        Color.FromRgb(251, 191, 36),
+        Color.FromRgb(244, 114, 182),
+        Color.FromRgb(165, 243, 252));
+
     public static SolidColorBrush Solid(Color c)
     {
         var b = new SolidColorBrush(c);

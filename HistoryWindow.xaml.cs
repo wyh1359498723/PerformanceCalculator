@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 
 namespace PerformanceCalculator2;
 
@@ -14,7 +17,42 @@ public partial class HistoryWindow : Window
         _repo = repo;
         InitializeComponent();
         GridBatches.ItemsSource = _rows;
-        Loaded += (_, _) => ReloadList();
+        Loaded += (_, _) =>
+        {
+            ReloadList();
+            StyleHistoryGrid();
+        };
+    }
+
+    private void StyleHistoryGrid()
+    {
+        var t = UiTheme.Tech;
+        var dg = GridBatches;
+        dg.Background = UiTheme.Solid(t.GridBg);
+        dg.BorderThickness = new Thickness(0);
+        dg.HorizontalGridLinesBrush = UiTheme.Solid(t.GridLine);
+        dg.RowBackground = UiTheme.Solid(t.GridBg);
+        dg.AlternatingRowBackground = UiTheme.Solid(t.GridAlt);
+        dg.Foreground = UiTheme.Solid(t.TextPrimary);
+        dg.VerticalGridLinesBrush = Brushes.Transparent;
+
+        var headerStyle = new Style(typeof(DataGridColumnHeader));
+        headerStyle.Setters.Add(new Setter(BackgroundProperty, UiTheme.Solid(t.GridHeader)));
+        headerStyle.Setters.Add(new Setter(ForegroundProperty, UiTheme.Solid(t.TextPrimary)));
+        headerStyle.Setters.Add(new Setter(FontWeightProperty, FontWeights.SemiBold));
+        headerStyle.Setters.Add(new Setter(PaddingProperty, new Thickness(8, 6, 8, 6)));
+        dg.ColumnHeaderStyle = headerStyle;
+
+        var cellStyle = new Style(typeof(DataGridCell));
+        cellStyle.Setters.Add(new Setter(PaddingProperty, new Thickness(8, 4, 8, 4)));
+        cellStyle.Setters.Add(new Setter(ForegroundProperty, UiTheme.Solid(t.TextPrimary)));
+        cellStyle.Setters.Add(new Setter(BackgroundProperty, Brushes.Transparent));
+        cellStyle.Setters.Add(new Setter(BorderThicknessProperty, new Thickness(0)));
+        var selectedTrigger = new Trigger { Property = DataGridCell.IsSelectedProperty, Value = true };
+        selectedTrigger.Setters.Add(new Setter(BackgroundProperty, UiTheme.Solid(t.GridSelectionBg)));
+        selectedTrigger.Setters.Add(new Setter(ForegroundProperty, UiTheme.Solid(t.GridSelectionFg)));
+        cellStyle.Triggers.Add(selectedTrigger);
+        dg.CellStyle = cellStyle;
     }
 
     private void ReloadList()

@@ -6,6 +6,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using OxyPlot;
@@ -19,6 +20,8 @@ public partial class MainWindow : Window
 {
     private readonly HistoryRepository _repo = new();
     private readonly SemaphoreSlim _dataWorkLock = new(1, 1);
+    private string? _operatorTrendName;
+    private bool _suppressOperatorSelectionRefresh;
     private readonly ObservableCollection<string> _perfMonthItems = new();
     private readonly ObservableCollection<SelectableMonth> _chartMonthItems = new();
     private readonly ObservableCollection<OperatorGridRow> _operatorRows = new();
@@ -27,8 +30,12 @@ public partial class MainWindow : Window
     private bool _suppressMonthUi;
     private const int ImportProgressStripHeight = 42;
     private double _panelTopIdleHeight;
+    private Storyboard? _dragPulseStoryboard;
 
-    private UiTheme Theme => ChkDarkMode.IsChecked == true ? UiTheme.Dark : UiTheme.Light;
+    /// <summary>默认浅色；勾选「科幻深色」为 Tech 主题。</summary>
+    private UiTheme Theme => ChkDarkMode.IsChecked == true ? UiTheme.Tech : UiTheme.Light;
+
+    private bool IsTechChrome => ChkDarkMode.IsChecked == true;
 
     public MainWindow()
     {
@@ -41,7 +48,40 @@ public partial class MainWindow : Window
         ApplyChrome();
         StyleDataGrid(DgvOperators);
         StyleDataGrid(DgvMonths);
+        DgvOperators.SelectionChanged += DgvOperators_SelectionChanged;
         Loaded += MainWindow_Loaded;
+    }
+
+    private void DgvOperators_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressOperatorSelectionRefresh) return;
+        string? next = DgvOperators.SelectedItem is OperatorGridRow r ? r.OperatorName : null;
+        if (string.Equals(next, _operatorTrendName, StringComparison.OrdinalIgnoreCase))
+            return;
+        _operatorTrendName = next;
+        RefreshViews();
+    }
+
+    private void RestoreOperatorGridSelection()
+    {
+        if (string.IsNullOrEmpty(_operatorTrendName)) return;
+        var match = _operatorRows.FirstOrDefault(r =>
+            string.Equals(r.OperatorName, _operatorTrendName, StringComparison.OrdinalIgnoreCase));
+        if (match == null)
+        {
+            _operatorTrendName = null;
+            return;
+        }
+
+        _suppressOperatorSelectionRefresh = true;
+        try
+        {
+            DgvOperators.SelectedItem = match;
+        }
+        finally
+        {
+            _suppressOperatorSelectionRefresh = false;
+        }
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -157,45 +197,164 @@ public partial class MainWindow : Window
     private void ApplyChrome()
     {
         var t = Theme;
-        Background = UiTheme.Solid(t.Bg);
+        bool tech = IsTechChrome;
+
+        RootChrome.Background = tech ? new SolidColorBrush(Color.FromRgb(5, 8, 15)) : UiTheme.Solid(t.Bg);
+        Background = Brushes.Transparent;
         Foreground = UiTheme.Solid(t.TextPrimary);
-        MainGrid.Background = UiTheme.Solid(t.Bg);
+        MainGrid.Background = Brushes.Transparent;
+        TechBackdrop.Visibility = tech ? Visibility.Visible : Visibility.Collapsed;
 
-        PanelTop.Background = UiTheme.Solid(t.Header);
-        LblPath.Foreground = Brushes.White;
+        if (tech)
+        {
+            var hdr = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(1, 0.2)
+            };
+            hdr.GradientStops.Add(new GradientStop(Color.FromRgb(10, 18, 36), 0));
+            hdr.GradientStops.Add(new GradientStop(Color.FromRgb(8, 14, 28), 1));
+            PanelTop.Background = hdr;
+            LblPath.Foreground = new SolidColorBrush(Color.FromRgb(148, 180, 200));
+        }
+        else
+        {
+            PanelTop.Background = UiTheme.Solid(t.Header);
+            LblPath.Foreground = UiTheme.Solid(t.TextMuted);
+        }
 
-        StyleHeaderButton(BtnSelectFiles);
-        StyleHeaderButton(BtnExportOperatorChart);
-        StyleHeaderButton(BtnExportMonthChart);
+        ApplyChromeButtons();
+        ApplyDropZoneIdle();
+        LblDropHint.Foreground = tech ? new SolidColorBrush(Color.FromRgb(125, 211, 252)) : UiTheme.Solid(t.TextMuted);
 
-        ChkDarkMode.Foreground = Brushes.White;
-        ChkDarkMode.Background = Brushes.Transparent;
+        if (tech)
+        {
+            PanelImportProgress.Background = new SolidColorBrush(Color.FromRgb(12, 15, 28));
+            PanelImportProgress.BorderBrush = new SolidColorBrush(Color.FromArgb(0x55, 34, 211, 238));
+            LblImportDetail.Foreground = new SolidColorBrush(Color.FromRgb(186, 230, 253));
+            if (TryFindResource("TechProgressBar") is Style pbs)
+                ProgressImport.Style = pbs;
+        }
+        else
+        {
+            PanelImportProgress.Background = UiTheme.Solid(t.Header);
+            PanelImportProgress.BorderBrush = UiTheme.Solid(t.GridLine);
+            LblImportDetail.Foreground = Brushes.White;
+            ProgressImport.Style = null;
+        }
 
-        PanelDrop.Background = UiTheme.Solid(t.DropZone);
-        PanelDrop.BorderBrush = UiTheme.Solid(t.GridLine);
-        LblDropHint.Foreground = UiTheme.Solid(t.TextMuted);
-
-        PanelImportProgress.Background = UiTheme.Solid(t.Header);
-        LblImportDetail.Foreground = Brushes.White;
-
-        PanelPerf.Background = UiTheme.Solid(t.Bg);
+        PanelPerf.Background = Brushes.Transparent;
         CboPerfMonth.Background = UiTheme.Solid(t.GridBg);
         CboPerfMonth.Foreground = UiTheme.Solid(t.TextPrimary);
         LblAvgEffective.Foreground = UiTheme.Solid(t.TextPrimary);
         ChkBelowAvg.Foreground = UiTheme.Solid(t.TextPrimary);
-        StyleHeaderButton(BtnHistory);
 
+        if (tech && TryFindResource("TechComboBox") is Style cbSt)
+            CboPerfMonth.Style = cbSt;
+        else
+            CboPerfMonth.Style = null;
+
+        if (tech && TryFindResource("TechCheckBox") is Style chkSt)
+        {
+            ChkDarkMode.Style = chkSt;
+            ChkBelowAvg.Style = chkSt;
+        }
+        else
+        {
+            ChkDarkMode.Style = null;
+            ChkBelowAvg.Style = null;
+            ChkDarkMode.Foreground = Brushes.White;
+            ChkBelowAvg.Foreground = UiTheme.Solid(t.TextPrimary);
+            ChkDarkMode.Background = Brushes.Transparent;
+        }
+
+        ApplyMonthPickerChrome(tech, t);
+        ApplyChromeCards(tech, t);
         PlotMonth.Background = UiTheme.Solid(t.ChartSurface);
     }
 
-    private void StyleHeaderButton(Button b)
+    /// <summary>图表统计月份多选区：背景与文字强对比（浅色主题下避免深色底+深色字）。</summary>
+    private void ApplyMonthPickerChrome(bool tech, UiTheme t)
     {
-        b.Background = UiTheme.Solid(Theme.Accent);
-        b.Foreground = Brushes.White;
-        b.FontWeight = System.Windows.FontWeights.Bold;
-        b.Padding = new Thickness(10, 4, 10, 4);
-        b.Cursor = Cursors.Hand;
-        b.BorderThickness = new Thickness(0);
+        if (tech)
+        {
+            BdChartMonthPicker.Background = new SolidColorBrush(Color.FromRgb(10, 20, 38));
+            BdChartMonthPicker.BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 34, 211, 238));
+            ChartMonthItemsControl.Foreground = new SolidColorBrush(Color.FromRgb(248, 252, 255));
+            LblChartMonthHint.Foreground = new SolidColorBrush(Color.FromRgb(165, 220, 245));
+        }
+        else
+        {
+            BdChartMonthPicker.Background = UiTheme.Solid(Colors.White);
+            BdChartMonthPicker.BorderBrush = UiTheme.Solid(t.GridLine);
+            ChartMonthItemsControl.Foreground = UiTheme.Solid(t.TextPrimary);
+            LblChartMonthHint.Foreground = UiTheme.Solid(t.TextMuted);
+        }
+    }
+
+    private void ApplyChromeButtons()
+    {
+        bool tech = IsTechChrome;
+        var t = Theme;
+        foreach (var b in new[] { BtnSelectFiles, BtnExportOperatorChart, BtnExportMonthChart, BtnHistory })
+        {
+            if (tech && TryFindResource("TechGlowButton") is Style st)
+            {
+                b.Style = st;
+                b.Background = UiTheme.Solid(t.Accent);
+                b.Foreground = new SolidColorBrush(Color.FromRgb(232, 251, 255));
+            }
+            else
+            {
+                b.Style = null;
+                b.Background = UiTheme.Solid(t.Accent);
+                b.Foreground = Brushes.White;
+            }
+
+            b.FontWeight = System.Windows.FontWeights.SemiBold;
+            b.Padding = new Thickness(16, 8, 16, 8);
+            b.Cursor = Cursors.Hand;
+            b.BorderThickness = new Thickness(0);
+        }
+    }
+
+    private void ApplyChromeCards(bool tech, UiTheme t)
+    {
+        if (tech && TryFindResource("TechCard") is Style cardSt)
+        {
+            CardLeft.Style = cardSt;
+            CardRight.Style = cardSt;
+        }
+        else
+        {
+            CardLeft.Style = null;
+            CardRight.Style = null;
+            CardLeft.Background = UiTheme.Solid(t.GridBg);
+            CardLeft.BorderBrush = UiTheme.Solid(t.GridLine);
+            CardLeft.BorderThickness = new Thickness(1);
+            CardLeft.CornerRadius = new CornerRadius(10);
+            CardLeft.Effect = null;
+            CardRight.Background = UiTheme.Solid(t.GridBg);
+            CardRight.BorderBrush = UiTheme.Solid(t.GridLine);
+            CardRight.BorderThickness = new Thickness(1);
+            CardRight.CornerRadius = new CornerRadius(10);
+            CardRight.Effect = null;
+        }
+    }
+
+    private void ApplyDropZoneIdle()
+    {
+        bool tech = IsTechChrome;
+        var t = Theme;
+        if (tech && TryFindResource("DropZoneTechBrush") is Brush db)
+            PanelDrop.Background = db;
+        else
+            PanelDrop.Background = UiTheme.Solid(t.DropZone);
+        PanelDrop.BorderBrush = tech
+            ? new SolidColorBrush(Color.FromArgb(0x77, 34, 211, 238))
+            : UiTheme.Solid(t.GridLine);
+        DropScanLine.Visibility = Visibility.Collapsed;
+        _dragPulseStoryboard?.Stop(DropScanLine);
     }
 
     private void StyleDataGrid(DataGrid dg)
@@ -253,19 +412,27 @@ public partial class MainWindow : Window
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             e.Effects = DragDropEffects.Copy;
-            PanelDrop.Background = UiTheme.Solid(Theme.DropZoneHover);
+            if (IsTechChrome)
+            {
+                PanelDrop.BorderBrush = new SolidColorBrush(Color.FromRgb(125, 230, 255));
+                PanelDrop.Background = new SolidColorBrush(Color.FromArgb(0xD0, 16, 28, 48));
+                DropScanLine.Visibility = Visibility.Visible;
+                _dragPulseStoryboard ??= TryFindResource("DragPulseStoryboard") as Storyboard;
+                _dragPulseStoryboard?.Begin(DropScanLine, true);
+            }
+            else
+                PanelDrop.Background = UiTheme.Solid(Theme.DropZoneHover);
         }
         else
             e.Effects = DragDropEffects.None;
         e.Handled = true;
     }
 
-    private void PanelDrop_DragLeave(object sender, DragEventArgs e) =>
-        PanelDrop.Background = UiTheme.Solid(Theme.DropZone);
+    private void PanelDrop_DragLeave(object sender, DragEventArgs e) => ApplyDropZoneIdle();
 
     private void PanelDrop_Drop(object sender, DragEventArgs e)
     {
-        PanelDrop.Background = UiTheme.Solid(Theme.DropZone);
+        ApplyDropZoneIdle();
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) return;
         var xlsx = paths.Where(p => p.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (xlsx.Length == 0)
@@ -279,6 +446,9 @@ public partial class MainWindow : Window
     private void SetImportUiBusy(bool busy)
     {
         BtnSelectFiles.IsEnabled = !busy;
+        BtnExportOperatorChart.IsEnabled = !busy;
+        BtnExportMonthChart.IsEnabled = !busy;
+        ChkDarkMode.IsEnabled = !busy;
         PanelDrop.IsHitTestVisible = !busy;
         ChartMonthItemsControl.IsEnabled = !busy;
         CboPerfMonth.IsEnabled = !busy;
@@ -366,19 +536,26 @@ public partial class MainWindow : Window
         public IReadOnlyList<MonthStats> MonthStats { get; set; } = Array.Empty<MonthStats>();
         public string AvgLabel { get; set; } = "平均有效工时：—";
         public IReadOnlyList<OperatorStats> OpGridRows { get; set; } = Array.Empty<OperatorStats>();
+        public IReadOnlyList<double?>? OperatorTrendOee { get; set; }
+        public string? OperatorTrendSeriesTitle { get; set; }
     }
 
     private static RefreshBindModel ComputeRefreshData(
         HistoryRepository repo,
         HashSet<string> chartMonths,
         string? tableMonth,
-        bool belowAvg)
+        bool belowAvg,
+        string? operatorTrendForChart)
     {
         var chartRecords = chartMonths.Count > 0
             ? repo.LoadRecordsForMonths(chartMonths)
             : new List<TestRecord>();
         var opStatsChart = PerformanceAggregator.AggregateByOperator(chartRecords).ToList();
         var monthStats = PerformanceAggregator.AggregateByMonth(chartRecords).ToList();
+        var trend = PerformanceAggregator.OperatorMonthlyOeeSeries(chartRecords, operatorTrendForChart, monthStats);
+        string? trendTitle = trend == null || string.IsNullOrWhiteSpace(operatorTrendForChart)
+            ? null
+            : $"{operatorTrendForChart.Trim()} · 各月 OEE";
 
         if (string.IsNullOrEmpty(tableMonth))
         {
@@ -387,7 +564,9 @@ public partial class MainWindow : Window
                 OpChartStats = opStatsChart,
                 MonthStats = monthStats,
                 AvgLabel = "平均有效工时：—",
-                OpGridRows = Array.Empty<OperatorStats>()
+                OpGridRows = Array.Empty<OperatorStats>(),
+                OperatorTrendOee = trend,
+                OperatorTrendSeriesTitle = trendTitle
             };
         }
 
@@ -404,17 +583,27 @@ public partial class MainWindow : Window
             OpChartStats = opStatsChart,
             MonthStats = monthStats,
             AvgLabel = avgLabel,
-            OpGridRows = display
+            OpGridRows = display,
+            OperatorTrendOee = trend,
+            OperatorTrendSeriesTitle = trendTitle
         };
     }
 
-    private void ApplyRefreshBind(RefreshBindModel m)
+    /// <param name="operatorKeyForTrend">本次汇总时用于操作员 OEE 曲线的姓名（与 <see cref="ComputeRefreshData"/> 传入值一致，避免刷新表格时 SelectionChanged 清空字段导致不画线）。</param>
+    private void ApplyRefreshBind(RefreshBindModel m, string? operatorKeyForTrend)
     {
         OperatorOeeChart.Bind(m.OpChartStats, Theme);
         BindMonthGrid(m.MonthStats);
-        BindMonthChart(m.MonthStats);
         LblAvgEffective.Text = m.AvgLabel;
         BindOperatorGrid(m.OpGridRows);
+        RestoreOperatorGridSelection();
+        bool showTrend = !string.IsNullOrEmpty(operatorKeyForTrend)
+            && m.OperatorTrendOee != null
+            && !string.IsNullOrEmpty(m.OperatorTrendSeriesTitle);
+        BindMonthChart(
+            m.MonthStats,
+            showTrend ? m.OperatorTrendOee : null,
+            showTrend ? m.OperatorTrendSeriesTitle : null);
     }
 
     private async Task LoadExcelFilesAsync(string[] paths)
@@ -483,8 +672,9 @@ public partial class MainWindow : Window
             var chartMonths = new HashSet<string>(GetSelectedChartMonths(), StringComparer.Ordinal);
             string? tableMonth = CboPerfMonth.SelectedItem as string;
             bool belowAvg = ChkBelowAvg.IsChecked == true;
-            var model = await Task.Run(() => ComputeRefreshData(repo, chartMonths, tableMonth, belowAvg)).ConfigureAwait(true);
-            ApplyRefreshBind(model);
+            string? opTrend = _operatorTrendName;
+            var model = await Task.Run(() => ComputeRefreshData(repo, chartMonths, tableMonth, belowAvg, opTrend)).ConfigureAwait(true);
+            ApplyRefreshBind(model, opTrend);
         }
         finally
         {
@@ -509,8 +699,9 @@ public partial class MainWindow : Window
             bool belowAvg = ChkBelowAvg.IsChecked == true;
             var repo = _repo;
 
-            var model = await Task.Run(() => ComputeRefreshData(repo, chartMonths, tableMonth, belowAvg)).ConfigureAwait(true);
-            ApplyRefreshBind(model);
+            string? opTrend = _operatorTrendName;
+            var model = await Task.Run(() => ComputeRefreshData(repo, chartMonths, tableMonth, belowAvg, opTrend)).ConfigureAwait(true);
+            ApplyRefreshBind(model, opTrend);
         }
         finally
         {
@@ -520,17 +711,25 @@ public partial class MainWindow : Window
 
     private void BindOperatorGrid(IReadOnlyList<OperatorStats> rows)
     {
-        _operatorRows.Clear();
-        foreach (var r in rows)
+        _suppressOperatorSelectionRefresh = true;
+        try
         {
-            _operatorRows.Add(new OperatorGridRow
+            _operatorRows.Clear();
+            foreach (var r in rows)
             {
-                OperatorName = r.OperatorName,
-                EffectiveMinutes = PerformanceAggregator.FormatMinutes(r.EffectiveMinutes),
-                ActualMinutes = PerformanceAggregator.FormatMinutes(r.ActualMinutes),
-                Oee = PerformanceAggregator.FormatOee(r.Oee),
-                Contribution = PerformanceAggregator.FormatPercent(r.ContributionRatio)
-            });
+                _operatorRows.Add(new OperatorGridRow
+                {
+                    OperatorName = r.OperatorName,
+                    EffectiveMinutes = PerformanceAggregator.FormatMinutes(r.EffectiveMinutes),
+                    ActualMinutes = PerformanceAggregator.FormatMinutes(r.ActualMinutes),
+                    Oee = PerformanceAggregator.FormatOee(r.Oee),
+                    Contribution = PerformanceAggregator.FormatPercent(r.ContributionRatio)
+                });
+            }
+        }
+        finally
+        {
+            _suppressOperatorSelectionRefresh = false;
         }
     }
 
@@ -551,10 +750,18 @@ public partial class MainWindow : Window
 
     private static OxyColor ToOxy(Color c) => OxyColor.FromArgb(c.A, c.R, c.G, c.B);
 
-    private void BindMonthChart(IReadOnlyList<MonthStats> stats)
+    private static void ApplySmoothOeeLine(LineSeries series)
     {
-        // OxyPlot 2.x 的 BarSeries 要求 CategoryAxis 在 Y 轴（横向柱），与「X=月份、Y=工时」不符。
-        // 此处用底部 LinearAxis 表示月份序号 + LinearBarSeries 竖柱 + 右侧 Y 轴表示 OEE（总有效÷总实际）。
+        int valid = series.Points.Count(p => !double.IsNaN(p.Y));
+        series.InterpolationAlgorithm = valid >= 3 ? InterpolationAlgorithms.CatmullRomSpline : null;
+    }
+
+    private void BindMonthChart(
+        IReadOnlyList<MonthStats> stats,
+        IReadOnlyList<double?>? operatorTrend,
+        string? operatorTrendTitle)
+    {
+        // 底部 LinearAxis 月份序号 + LinearBarSeries 竖柱 + 右侧 OEE；OEE 使用 Catmull-Rom 平滑。
         var t = Theme;
         const string xKey = "MonthIndex";
         const string yMinutesKey = "Minutes";
@@ -565,13 +772,21 @@ public partial class MainWindow : Window
         if (n == 0)
             monthKeys.Add("(无)");
 
+        bool showOperatorTrend = operatorTrend != null
+            && stats.Count > 0
+            && operatorTrend.Count == stats.Count
+            && !string.IsNullOrWhiteSpace(operatorTrendTitle);
+        string chartTitle = showOperatorTrend
+            ? "按月：工时（柱）与 OEE 平滑曲线（全员 + 所选操作员）"
+            : "按月：总有效工时、总实际工时（柱）与全员 OEE（平滑曲线）";
+
         var model = new PlotModel
         {
             Background = ToOxy(t.ChartSurface),
             PlotAreaBackground = ToOxy(t.ChartSurface),
             PlotAreaBorderColor = ToOxy(t.ChartBorder),
             PlotAreaBorderThickness = new OxyThickness(1),
-            Title = "按月：总有效工时、总实际工时（柱）与 OEE（折线，总有效÷总实际）",
+            Title = chartTitle,
             TitleColor = ToOxy(t.ChartTitleFg),
             TitleFont = "Microsoft YaHei UI",
             TitleFontSize = 14,
@@ -670,7 +885,7 @@ public partial class MainWindow : Window
 
         var sOee = new LineSeries
         {
-            Title = "OEE",
+            Title = "全员月度 OEE",
             XAxisKey = xKey,
             YAxisKey = yOeeKey,
             Color = ToOxy(t.ChartLineOee),
@@ -710,12 +925,49 @@ public partial class MainWindow : Window
             }
         }
 
+        ApplySmoothOeeLine(sOee);
+
+        LineSeries? sOpTrend = null;
+        if (showOperatorTrend)
+        {
+            var opRgb = Color.FromRgb(232, 121, 249);
+            sOpTrend = new LineSeries
+            {
+                Title = operatorTrendTitle!.Trim(),
+                XAxisKey = xKey,
+                YAxisKey = yOeeKey,
+                Color = ToOxy(opRgb),
+                StrokeThickness = 2.8,
+                LineStyle = LineStyle.Solid,
+                MarkerType = MarkerType.Triangle,
+                MarkerSize = 5.5,
+                MarkerFill = ToOxy(t.ChartSurface),
+                MarkerStroke = ToOxy(opRgb),
+                MarkerStrokeThickness = 2
+            };
+            for (int i = 0; i < stats.Count; i++)
+            {
+                var y = operatorTrend![i];
+                if (y.HasValue)
+                {
+                    sOpTrend.Points.Add(new DataPoint(i, y.Value));
+                    maxOee = Math.Max(maxOee, y.Value);
+                }
+                else
+                    sOpTrend.Points.Add(DataPoint.Undefined);
+            }
+
+            ApplySmoothOeeLine(sOpTrend);
+        }
+
         yMinutes.Maximum = maxMinutes <= 0 ? double.NaN : maxMinutes * 1.15;
         yOee.Maximum = maxOee <= 0 ? 1 : Math.Max(maxOee * 1.12, 1.02);
 
         model.Series.Add(sEff);
         model.Series.Add(sAct);
         model.Series.Add(sOee);
+        if (sOpTrend != null)
+            model.Series.Add(sOpTrend);
 
         PlotMonth.Model = model;
     }

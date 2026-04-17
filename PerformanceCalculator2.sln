@@ -1,9 +1,11 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36301.6 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PerformanceCalculator2", "PerformanceCalculator2.csproj", "{97BCCB1A-759E-4CD8-941E-1F7E1EEA45C3}"
+EndProject
+Project("{930C7802-8A8C-48F9-8165-68863B8ED235}") = "PerformanceCalculator2.Installer", "installer\PerformanceCalculator2.Installer.wixproj", "{C2D4E6F8-0A1B-4C3D-9E0F-1A2B3C4D5E6F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{97BCCB1A-759E-4CD8-941E-1F7E1EEA45C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{97BCCB1A-759E-4CD8-941E-1F7E1EEA45C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{97BCCB1A-759E-4CD8-941E-1F7E1EEA45C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C2D4E6F8-0A1B-4C3D-9E0F-1A2B3C4D5E6F}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{C2D4E6F8-0A1B-4C3D-9E0F-1A2B3C4D5E6F}.Debug|Any CPU.Build.0 = Debug|x64
+		{C2D4E6F8-0A1B-4C3D-9E0F-1A2B3C4D5E6F}.Release|Any CPU.ActiveCfg = Release|x64
+		{C2D4E6F8-0A1B-4C3D-9E0F-1A2B3C4D5E6F}.Release|Any CPU.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

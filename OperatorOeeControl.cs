@@ -53,6 +53,9 @@ internal sealed class OperatorOeeControl : FrameworkElement
         var titleTypeface = new Typeface(new FontFamily("Microsoft YaHei UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
         var titleFt = new FormattedText(TitleText, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, titleTypeface, 12, titleBrush, null, TextFormattingMode.Display, pixelsPerDip);
         dc.DrawText(titleFt, new Point(padL, 6));
+        var accentPen = new Pen(new SolidColorBrush(Color.FromArgb(200, t.Accent.R, t.Accent.G, t.Accent.B)), 2);
+        if (accentPen.CanFreeze) accentPen.Freeze();
+        dc.DrawLine(accentPen, new Point(padL, 26), new Point(Math.Min(w - padR, padL + 240), 26));
 
         if (_rows.Count == 0 || plotBottom <= plotTop)
         {

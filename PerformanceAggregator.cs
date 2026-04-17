@@ -69,6 +69,49 @@ public static class PerformanceAggregator
             .ToList();
     }
 
+    /// <summary>
+    /// 与 <paramref name="monthOrder"/> 各月顺序对齐，计算某操作员在对应月份内的 OEE（该月该员有效÷实际）；无数据或无效为 null。
+    /// </summary>
+    public static IReadOnlyList<double?>? OperatorMonthlyOeeSeries(
+        IEnumerable<TestRecord> chartRecords,
+        string? operatorName,
+        IReadOnlyList<MonthStats> monthOrder)
+    {
+        if (string.IsNullOrWhiteSpace(operatorName) || monthOrder.Count == 0)
+            return null;
+
+        var filtered = chartRecords
+            .Where(r => string.Equals(r.OperatorName, operatorName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (filtered.Count == 0)
+            return null;
+
+        var byMonth = filtered
+            .Where(r => !string.IsNullOrEmpty(r.MonthKey))
+            .GroupBy(r => r.MonthKey, StringComparer.Ordinal)
+            .ToDictionary(
+                g => g.Key,
+                g => (Eff: g.Sum(x => x.TestTimeMinutes), Act: g.Sum(x => x.ActualTimeMinutes)),
+                StringComparer.Ordinal);
+
+        var list = new List<double?>(monthOrder.Count);
+        foreach (var m in monthOrder)
+        {
+            if (!byMonth.TryGetValue(m.MonthKey, out var v))
+            {
+                list.Add(null);
+                continue;
+            }
+
+            if (v.Act <= PerformanceMetrics.MinActualMinutesForOee)
+                list.Add(null);
+            else
+                list.Add(v.Eff / v.Act);
+        }
+
+        return list;
+    }
+
     /// <summary>平均有效工时 = 总有效工时 / 有记录的操作员人数（去重）。</summary>
     public static double AverageEffectiveMinutesPerOperator(IEnumerable<TestRecord> records)
     {
