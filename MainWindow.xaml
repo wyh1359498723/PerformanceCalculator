@@ -153,6 +153,8 @@
                              MinWidth="200" Foreground="#e2e8f0"/>
                   <CheckBox x:Name="ChkBelowAvg" Content="仅显示低于平均有效工时" VerticalAlignment="Center" Margin="0,0,12,0"
                             Checked="ChkBelowAvg_Changed" Unchecked="ChkBelowAvg_Changed"/>
+                  <Button x:Name="BtnExportPerfMonth" Content="导出当月绩效表" Padding="14,6" Margin="0,0,10,0"
+                          Click="BtnExportPerfMonth_Click"/>
                   <Button x:Name="BtnHistory" Content="历史数据" Padding="14,6" Click="BtnHistory_Click"/>
                 </WrapPanel>
 

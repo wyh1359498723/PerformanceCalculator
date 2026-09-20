@@ -94,7 +94,7 @@ internal sealed class OperatorOeeControl : FrameworkElement
             double v = maxOee * ti / tickCount;
             double x = axisX0 + ti / (double)tickCount * (axisX1 - axisX0);
             dc.DrawLine(penAxis, new Point(x, axisYPos), new Point(x, axisYPos + 4));
-            string sv = v.ToString("0.####", CultureInfo.CurrentCulture);
+            string sv = v.ToString("P2", CultureInfo.CurrentCulture);
             var tickFt = new FormattedText(sv, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, tickTypeface, 10, tickBrush, null, TextFormattingMode.Display, pixelsPerDip);
             dc.DrawText(tickFt, new Point(x - tickFt.Width * 0.5, axisYPos + 5));
         }

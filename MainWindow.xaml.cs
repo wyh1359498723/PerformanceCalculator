@@ -448,6 +448,7 @@ public partial class MainWindow : Window
         BtnSelectFiles.IsEnabled = !busy;
         BtnExportOperatorChart.IsEnabled = !busy;
         BtnExportMonthChart.IsEnabled = !busy;
+        BtnExportPerfMonth.IsEnabled = !busy;
         ChkDarkMode.IsEnabled = !busy;
         PanelDrop.IsHitTestVisible = !busy;
         ChartMonthItemsControl.IsEnabled = !busy;
@@ -580,7 +581,8 @@ public partial class MainWindow : Window
 
         return new RefreshBindModel
         {
-            OpChartStats = opStatsChart,
+            // 与绩效表格同月：仅含该月有记录的操作员，避免跨「图表统计月份」汇总时离职人员仍出现在后续月份视图
+            OpChartStats = fullStats,
             MonthStats = monthStats,
             AvgLabel = avgLabel,
             OpGridRows = display,
@@ -851,7 +853,7 @@ public partial class MainWindow : Window
             TitleColor = ToOxy(t.ChartLineOee),
             MajorGridlineStyle = LineStyle.None,
             MinorGridlineStyle = LineStyle.None,
-            LabelFormatter = v => v.ToString("P0", System.Globalization.CultureInfo.CurrentCulture)
+            LabelFormatter = v => v.ToString("P2", System.Globalization.CultureInfo.CurrentCulture)
         };
 
         model.Axes.Add(xAxis);
@@ -1003,6 +1005,43 @@ public partial class MainWindow : Window
         try
         {
             ExportFrameworkElementToImage(OperatorOeeChart, dlg.FileName);
+            MessageBox.Show(this, $"已保存：{dlg.FileName}", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "导出失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void BtnExportPerfMonth_Click(object sender, RoutedEventArgs e)
+    {
+        if (CboPerfMonth.SelectedItem is not string monthKey || string.IsNullOrWhiteSpace(monthKey))
+        {
+            MessageBox.Show(this, "请先在「绩效表月份」中选择要导出的月份。", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var records = _repo.LoadRecordsForMonths(new HashSet<string>(StringComparer.Ordinal) { monthKey });
+        var stats = PerformanceAggregator.AggregateByOperator(records).ToList();
+        if (stats.Count == 0)
+        {
+            MessageBox.Show(this, $"月份「{monthKey}」暂无绩效数据。", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        double avg = PerformanceAggregator.AverageEffectiveMinutesPerOperator(records);
+        var dlg = new SaveFileDialog
+        {
+            Filter = "Excel 工作簿 (*.xlsx)|*.xlsx",
+            FileName = $"绩效表_{monthKey}_{DateTime.Now:yyyyMMdd_HHmm}",
+            DefaultExt = ".xlsx",
+            AddExtension = true
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        try
+        {
+            MonthlyPerformanceExporter.ExportToXlsx(dlg.FileName, monthKey, stats, avg);
             MessageBox.Show(this, $"已保存：{dlg.FileName}", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)

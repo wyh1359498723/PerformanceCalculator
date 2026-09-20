@@ -130,5 +130,5 @@ public static class PerformanceAggregator
         (ratio * 100).ToString("0.##", CultureInfo.CurrentCulture) + "%";
 
     public static string FormatOee(double? oee) =>
-        !oee.HasValue ? "—" : oee.Value.ToString("0.####", CultureInfo.CurrentCulture);
+        !oee.HasValue ? "—" : oee.Value.ToString("P2", CultureInfo.CurrentCulture);
 }
