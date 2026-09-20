@@ -110,9 +110,16 @@ public partial class MainWindow : Window
         DgvMonths.Columns.Add(new DataGridTextColumn { Header = "OEE ⇅", Binding = new Binding(nameof(MonthGridRow.Oee)), SortMemberPath = nameof(MonthGridRow.OeeValue), Width = new DataGridLength(88) });
     }
 
-    private void RepopulateMonthUis(bool selectLatestTableMonth)
+    private void RepopulateMonthUis(
+        bool selectLatestTableMonth,
+        string? preferredTableMonth = null,
+        ISet<string>? preferredChartMonths = null)
     {
         var months = _repo.ListDistinctMonths().OrderByDescending(m => m, StringComparer.Ordinal).ToList();
+        string? tableMonthToRestore = preferredTableMonth;
+        HashSet<string>? chartMonthsToRestore = preferredChartMonths == null
+            ? null
+            : new HashSet<string>(preferredChartMonths, StringComparer.Ordinal);
 
         _suppressMonthUi = true;
         try
@@ -123,7 +130,12 @@ public partial class MainWindow : Window
 
             _chartMonthItems.Clear();
             foreach (var m in months.OrderBy(x => x, StringComparer.Ordinal))
-                _chartMonthItems.Add(new SelectableMonth(m));
+            {
+                _chartMonthItems.Add(new SelectableMonth(m)
+                {
+                    IsSelected = chartMonthsToRestore == null || chartMonthsToRestore.Contains(m)
+                });
+            }
 
             if (months.Count == 0)
             {
@@ -139,9 +151,8 @@ public partial class MainWindow : Window
             }
             else
             {
-                var cur = CboPerfMonth.SelectedItem as string;
-                if (!string.IsNullOrEmpty(cur) && months.Contains(cur!))
-                    CboPerfMonth.SelectedItem = cur;
+                if (!string.IsNullOrEmpty(tableMonthToRestore) && months.Contains(tableMonthToRestore!))
+                    CboPerfMonth.SelectedItem = tableMonthToRestore;
                 else
                     CboPerfMonth.SelectedIndex = months.Count > 0 ? 0 : -1;
             }
@@ -179,9 +190,17 @@ public partial class MainWindow : Window
 
     private void BtnHistory_Click(object sender, RoutedEventArgs e)
     {
+        string? tableMonth = CboPerfMonth.SelectedItem as string;
+        var chartMonths = GetSelectedChartMonths();
         var w = new HistoryWindow(_repo) { Owner = this };
         w.ShowDialog();
-        RepopulateMonthUis(selectLatestTableMonth: false);
+        if (!w.HasChanges)
+            return;
+
+        RepopulateMonthUis(
+            selectLatestTableMonth: false,
+            preferredTableMonth: tableMonth,
+            preferredChartMonths: chartMonths);
         RefreshViews();
     }
 
@@ -225,6 +244,11 @@ public partial class MainWindow : Window
             LblPath.Foreground = UiTheme.Solid(t.TextMuted);
         }
 
+        LblTitle.Foreground = UiTheme.Solid(Color.FromRgb(240, 249, 255));
+        BadgeLine.Background = UiTheme.Solid(tech ? Color.FromRgb(18, 31, 49) : t.GridHeader);
+        BadgeLine.BorderBrush = UiTheme.Solid(tech ? Color.FromArgb(0x66, 34, 211, 238) : t.GridLine);
+        LblBadge.Foreground = UiTheme.Solid(tech ? Color.FromRgb(125, 211, 252) : t.TextMuted);
+
         ApplyChromeButtons();
         ApplyDropZoneIdle();
         LblDropHint.Foreground = tech ? new SolidColorBrush(Color.FromRgb(125, 211, 252)) : UiTheme.Solid(t.TextMuted);
@@ -245,10 +269,10 @@ public partial class MainWindow : Window
             ProgressImport.Style = null;
         }
 
-        PanelPerf.Background = Brushes.Transparent;
         CboPerfMonth.Background = UiTheme.Solid(t.GridBg);
         CboPerfMonth.Foreground = UiTheme.Solid(t.TextPrimary);
         LblAvgEffective.Foreground = UiTheme.Solid(t.TextPrimary);
+        LblPerfMonthCaption.Foreground = UiTheme.Solid(t.TextMuted);
         ChkBelowAvg.Foreground = UiTheme.Solid(t.TextPrimary);
 
         if (tech && TryFindResource("TechComboBox") is Style cbSt)
@@ -298,50 +322,71 @@ public partial class MainWindow : Window
     {
         bool tech = IsTechChrome;
         var t = Theme;
-        foreach (var b in new[] { BtnSelectFiles, BtnExportOperatorChart, BtnExportMonthChart, BtnHistory })
+        foreach (var b in new[] { BtnSelectFiles, BtnExportOperatorChart, BtnExportMonthChart, BtnHistory, BtnExportPerfMonth })
         {
+            bool primary = ReferenceEquals(b, BtnSelectFiles);
             if (tech && TryFindResource("TechGlowButton") is Style st)
             {
                 b.Style = st;
-                b.Background = UiTheme.Solid(t.Accent);
-                b.Foreground = new SolidColorBrush(Color.FromRgb(232, 251, 255));
+                b.Background = UiTheme.Solid(primary ? t.Accent : Color.FromRgb(18, 32, 52));
+                b.Foreground = new SolidColorBrush(primary ? Color.FromRgb(7, 32, 45) : Color.FromRgb(226, 245, 255));
+                b.BorderBrush = UiTheme.Solid(primary ? t.Accent : Color.FromRgb(40, 62, 88));
             }
             else
             {
                 b.Style = null;
-                b.Background = UiTheme.Solid(t.Accent);
-                b.Foreground = Brushes.White;
+                b.Background = UiTheme.Solid(primary ? t.Accent : t.GridBg);
+                b.Foreground = UiTheme.Solid(primary ? Colors.White : t.TextPrimary);
+                b.BorderBrush = UiTheme.Solid(primary ? t.Accent : t.GridLine);
             }
 
             b.FontWeight = System.Windows.FontWeights.SemiBold;
-            b.Padding = new Thickness(16, 8, 16, 8);
+            b.Padding = new Thickness(14, 7, 14, 7);
             b.Cursor = Cursors.Hand;
-            b.BorderThickness = new Thickness(0);
+            b.BorderThickness = new Thickness(primary ? 0 : 1);
         }
     }
 
     private void ApplyChromeCards(bool tech, UiTheme t)
     {
+        CardLeft.Background = Brushes.Transparent;
+        CardRight.Background = Brushes.Transparent;
+
+        var cards = new[]
+        {
+            PanelPerf, CardOperatorTable, CardMonthTable,
+            CardOperatorChart, CardMonthChart,
+            KpiCardOperators, KpiCardEffective, KpiCardActual, KpiCardOee
+        };
+
         if (tech && TryFindResource("TechCard") is Style cardSt)
         {
-            CardLeft.Style = cardSt;
-            CardRight.Style = cardSt;
+            foreach (var card in cards)
+                card.Style = cardSt;
         }
         else
         {
-            CardLeft.Style = null;
-            CardRight.Style = null;
-            CardLeft.Background = UiTheme.Solid(t.GridBg);
-            CardLeft.BorderBrush = UiTheme.Solid(t.GridLine);
-            CardLeft.BorderThickness = new Thickness(1);
-            CardLeft.CornerRadius = new CornerRadius(10);
-            CardLeft.Effect = null;
-            CardRight.Background = UiTheme.Solid(t.GridBg);
-            CardRight.BorderBrush = UiTheme.Solid(t.GridLine);
-            CardRight.BorderThickness = new Thickness(1);
-            CardRight.CornerRadius = new CornerRadius(10);
-            CardRight.Effect = null;
+            foreach (var card in cards)
+            {
+                card.Style = null;
+                card.Background = UiTheme.Solid(t.GridBg);
+                card.BorderBrush = UiTheme.Solid(t.GridLine);
+                card.BorderThickness = new Thickness(1);
+                card.CornerRadius = new CornerRadius(10);
+                card.Effect = null;
+            }
         }
+
+        CardOperatorChart.Background = UiTheme.Solid(t.ChartSurface);
+        CardMonthChart.Background = UiTheme.Solid(t.ChartSurface);
+
+        foreach (var caption in new[] { KpiCaptionOperators, KpiCaptionEffective, KpiCaptionActual, KpiCaptionOee })
+            caption.Foreground = UiTheme.Solid(t.TextMuted);
+        foreach (var value in new[] { LblKpiOperatorCount, LblKpiEffective, LblKpiActual })
+            value.Foreground = UiTheme.Solid(t.TextPrimary);
+        LblKpiOee.Foreground = UiTheme.Solid(t.Accent);
+        LblOperatorTableTitle.Foreground = UiTheme.Solid(t.TextPrimary);
+        LblMonthTableTitle.Foreground = UiTheme.Solid(t.TextPrimary);
     }
 
     private void ApplyDropZoneIdle()
@@ -369,6 +414,10 @@ public partial class MainWindow : Window
         dg.AlternatingRowBackground = UiTheme.Solid(t.GridAlt);
         dg.Foreground = UiTheme.Solid(t.TextPrimary);
         dg.VerticalGridLinesBrush = Brushes.Transparent;
+        dg.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
+        dg.RowHeight = 32;
+        dg.ColumnHeaderHeight = 34;
+        dg.CanUserResizeRows = false;
 
         var headerStyle = new Style(typeof(DataGridColumnHeader));
         headerStyle.Setters.Add(new Setter(BackgroundProperty, UiTheme.Solid(t.GridHeader)));
@@ -569,6 +618,10 @@ public partial class MainWindow : Window
         public IReadOnlyList<OperatorStats> OpChartStats { get; set; } = Array.Empty<OperatorStats>();
         public IReadOnlyList<MonthStats> MonthStats { get; set; } = Array.Empty<MonthStats>();
         public string AvgLabel { get; set; } = "平均有效工时：—";
+        public string OperatorCountLabel { get; set; } = "—";
+        public string EffectiveTotalLabel { get; set; } = "—";
+        public string ActualTotalLabel { get; set; } = "—";
+        public string OeeLabel { get; set; } = "—";
         public IReadOnlyList<OperatorStats> OpGridRows { get; set; } = Array.Empty<OperatorStats>();
         public IReadOnlyList<double?>? OperatorTrendOee { get; set; }
         public string? OperatorTrendSeriesTitle { get; set; }
@@ -608,6 +661,11 @@ public partial class MainWindow : Window
         double avg = PerformanceAggregator.AverageEffectiveMinutesPerOperator(tableRecords);
         string avgLabel = $"平均有效工时：{PerformanceAggregator.FormatMinutes(avg)} 分（总有效÷人数）";
         var fullStats = PerformanceAggregator.AggregateByOperator(tableRecords).ToList();
+        double totalEffective = tableRecords.Sum(r => r.TestTimeMinutes);
+        double totalActual = tableRecords.Sum(r => r.ActualTimeMinutes);
+        double? overallOee = totalActual > PerformanceMetrics.MinActualMinutesForOee
+            ? totalEffective / totalActual
+            : null;
         var display = belowAvg
             ? fullStats.Where(o => o.EffectiveMinutes < avg - 1e-9).ToList()
             : fullStats;
@@ -618,6 +676,10 @@ public partial class MainWindow : Window
             OpChartStats = fullStats,
             MonthStats = monthStats,
             AvgLabel = avgLabel,
+            OperatorCountLabel = fullStats.Count.ToString("N0", System.Globalization.CultureInfo.CurrentCulture),
+            EffectiveTotalLabel = totalEffective.ToString("N0", System.Globalization.CultureInfo.CurrentCulture),
+            ActualTotalLabel = totalActual.ToString("N0", System.Globalization.CultureInfo.CurrentCulture),
+            OeeLabel = PerformanceAggregator.FormatOee(overallOee),
             OpGridRows = display,
             OperatorTrendOee = trend,
             OperatorTrendSeriesTitle = trendTitle
@@ -630,6 +692,10 @@ public partial class MainWindow : Window
         OperatorOeeChart.Bind(m.OpChartStats, Theme);
         BindMonthGrid(m.MonthStats);
         LblAvgEffective.Text = m.AvgLabel;
+        LblKpiOperatorCount.Text = m.OperatorCountLabel;
+        LblKpiEffective.Text = m.EffectiveTotalLabel;
+        LblKpiActual.Text = m.ActualTotalLabel;
+        LblKpiOee.Text = m.OeeLabel;
         BindOperatorGrid(m.OpGridRows);
         RestoreOperatorGridSelection();
         bool showTrend = !string.IsNullOrEmpty(operatorKeyForTrend)
@@ -817,8 +883,8 @@ public partial class MainWindow : Window
             && operatorTrend.Count == stats.Count
             && !string.IsNullOrWhiteSpace(operatorTrendTitle);
         string chartTitle = showOperatorTrend
-            ? "按月：工时（柱）与 OEE 平滑曲线（全员 + 所选操作员）"
-            : "按月：总有效工时、总实际工时（柱）与全员 OEE（平滑曲线）";
+            ? "月度工时与 OEE 趋势（全员 + 所选操作员）"
+            : "月度工时与 OEE 趋势";
 
         var model = new PlotModel
         {

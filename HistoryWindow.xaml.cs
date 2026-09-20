@@ -12,6 +12,8 @@ public partial class HistoryWindow : Window
     private readonly HistoryRepository _repo;
     private readonly ObservableCollection<DataSourceRowVm> _rows = new();
 
+    public bool HasChanges { get; private set; }
+
     public HistoryWindow(HistoryRepository repo)
     {
         _repo = repo;
@@ -91,6 +93,7 @@ public partial class HistoryWindow : Window
             return;
 
         _repo.DeleteDataSources(sel.Select(r => r.Id));
+        HasChanges = true;
 
         ReloadList();
     }
