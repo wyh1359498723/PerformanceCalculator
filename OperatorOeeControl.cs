@@ -41,7 +41,7 @@ internal sealed class OperatorOeeControl : FrameworkElement
 
         double w = ActualWidth;
         double h = ActualHeight;
-        const double titleH = 30;
+        const double titleH = 38;
         const double axisBottom = 30;
         const double padL = 10;
         const double padR = 10;
@@ -51,11 +51,11 @@ internal sealed class OperatorOeeControl : FrameworkElement
 
         var titleBrush = UiTheme.Solid(t.ChartTitleFg);
         var titleTypeface = new Typeface(new FontFamily("Microsoft YaHei UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
-        var titleFt = new FormattedText(TitleText, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, titleTypeface, 12, titleBrush, null, TextFormattingMode.Display, pixelsPerDip);
-        dc.DrawText(titleFt, new Point(padL, 6));
-        var accentPen = new Pen(new SolidColorBrush(Color.FromArgb(200, t.Accent.R, t.Accent.G, t.Accent.B)), 2);
-        if (accentPen.CanFreeze) accentPen.Freeze();
-        dc.DrawLine(accentPen, new Point(padL, 26), new Point(Math.Min(w - padR, padL + 240), 26));
+        var titleFt = new FormattedText(TitleText, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, titleTypeface, 14, titleBrush, null, TextFormattingMode.Display, pixelsPerDip);
+        dc.DrawText(titleFt, new Point(padL + 2, 8));
+        var titleLinePen = new Pen(UiTheme.Solid(t.ChartBorder), 1);
+        if (titleLinePen.CanFreeze) titleLinePen.Freeze();
+        dc.DrawLine(titleLinePen, new Point(0, 36), new Point(w, 36));
 
         if (_rows.Count == 0 || plotBottom <= plotTop)
         {
@@ -67,12 +67,10 @@ internal sealed class OperatorOeeControl : FrameworkElement
 
         double plotH = plotBottom - plotTop;
         double rowH = plotH / _rows.Count;
-        double maxOee = _rows.Max(x => x.Oee ?? 0);
-        if (maxOee < 1e-12) maxOee = 1;
+        double maxOee = Math.Max(1.0, _rows.Max(x => x.Oee ?? 0));
 
-        double axisX0 = padL + 52;
-        double nameReserve = Math.Max(100, Math.Min(200, w * 0.24));
-        double axisX1 = w - padR - nameReserve;
+        double axisX0 = padL + 78;
+        double axisX1 = w - padR - 54;
         if (axisX1 <= axisX0 + 40)
             axisX1 = axisX0 + 40;
 
@@ -93,13 +91,28 @@ internal sealed class OperatorOeeControl : FrameworkElement
         {
             double v = maxOee * ti / tickCount;
             double x = axisX0 + ti / (double)tickCount * (axisX1 - axisX0);
+            dc.DrawLine(penGrid, new Point(x, plotTop), new Point(x, axisYPos));
             dc.DrawLine(penAxis, new Point(x, axisYPos), new Point(x, axisYPos + 4));
-            string sv = v.ToString("P2", CultureInfo.CurrentCulture);
+            string sv = v.ToString("P0", CultureInfo.CurrentCulture);
             var tickFt = new FormattedText(sv, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, tickTypeface, 10, tickBrush, null, TextFormattingMode.Display, pixelsPerDip);
             dc.DrawText(tickFt, new Point(x - tickFt.Width * 0.5, axisYPos + 5));
         }
 
-        var barBrush = UiTheme.Solid(t.ChartBarOee);
+        Brush barBrush;
+        if (ReferenceEquals(t, UiTheme.Tech))
+        {
+            var gradient = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 0.5),
+                EndPoint = new Point(1, 0.5)
+            };
+            gradient.GradientStops.Add(new GradientStop(Color.FromRgb(66, 165, 255), 0));
+            gradient.GradientStops.Add(new GradientStop(Color.FromRgb(69, 229, 220), 1));
+            if (gradient.CanFreeze) gradient.Freeze();
+            barBrush = gradient;
+        }
+        else
+            barBrush = UiTheme.Solid(t.ChartBarOee);
         var barPen = new Pen(new SolidColorBrush(Color.FromRgb(
             (byte)Math.Max(0, t.ChartBarOee.R - 35),
             (byte)Math.Max(0, t.ChartBarOee.G - 25),
@@ -122,19 +135,20 @@ internal sealed class OperatorOeeControl : FrameworkElement
             if (barLen < 2) barLen = 2;
 
             dc.DrawRectangle(barBrush, barPen, new Rect(axisX0, y0, barLen, barH));
-            dc.DrawLine(penGrid, new Point(axisX0, cy), new Point(axisX1, cy));
 
             string name = s.OperatorName ?? "";
-            double nameX = axisX0 + barLen + 6;
-            double avail = w - padR - nameX;
-            if (avail < 20) avail = 20;
             var nameFt = new FormattedText(name, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, nameTypeface, 11, nameBrush, null, TextFormattingMode.Display, pixelsPerDip)
             {
-                MaxTextWidth = avail,
+                MaxTextWidth = axisX0 - padL - 10,
                 MaxLineCount = 1,
                 Trimming = TextTrimming.CharacterEllipsis
             };
-            dc.DrawText(nameFt, new Point(nameX, plotTop + i * rowH + (rowH - nameFt.Height) * 0.5));
+            dc.DrawText(nameFt, new Point(axisX0 - 8 - nameFt.Width, plotTop + i * rowH + (rowH - nameFt.Height) * 0.5));
+
+            string valueText = oee.ToString("P1", CultureInfo.CurrentCulture);
+            var valueFt = new FormattedText(valueText, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, nameTypeface, 10.5, nameBrush, null, TextFormattingMode.Display, pixelsPerDip);
+            double valueX = Math.Min(axisX0 + barLen + 7, w - padR - valueFt.Width);
+            dc.DrawText(valueFt, new Point(valueX, plotTop + i * rowH + (rowH - valueFt.Height) * 0.5));
         }
 
         var axisLabelTypeface = new Typeface(new FontFamily("Microsoft YaHei UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);

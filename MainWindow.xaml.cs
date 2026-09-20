@@ -10,6 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using OxyPlot;
+using OxyPlot.Annotations;
 using OxyPlot.Axes;
 using OxyPlot.Legends;
 using OxyPlot.Series;
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<MonthGridRow> _monthRows = new();
 
     private bool _suppressMonthUi;
+    private bool _initializingUi = true;
     private const int ImportProgressStripHeight = 42;
     private double _panelTopIdleHeight;
     private Storyboard? _dragPulseStoryboard;
@@ -50,7 +52,34 @@ public partial class MainWindow : Window
         StyleDataGrid(DgvMonths);
         DgvOperators.SelectionChanged += DgvOperators_SelectionChanged;
         Loaded += MainWindow_Loaded;
+        _initializingUi = false;
     }
+
+    private void PanelTop_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left) return;
+        if (e.ClickCount == 2)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            return;
+        }
+
+        try
+        {
+            DragMove();
+        }
+        catch (InvalidOperationException)
+        {
+            // 鼠标在拖动开始前已释放时无需处理。
+        }
+    }
+
+    private void BtnWindowMinimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void BtnWindowMaximize_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void BtnWindowClose_Click(object sender, RoutedEventArgs e) => Close();
 
     private void DgvOperators_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -96,18 +125,40 @@ public partial class MainWindow : Window
     {
         DgvOperators.Columns.Clear();
         DgvOperators.CanUserSortColumns = true;
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "操作员 ⇅", Binding = new Binding(nameof(OperatorGridRow.OperatorName)), SortMemberPath = nameof(OperatorGridRow.OperatorName), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "有效工时(分) ⇅", Binding = new Binding(nameof(OperatorGridRow.EffectiveMinutes)), SortMemberPath = nameof(OperatorGridRow.EffectiveMinutesValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "实际工时(分) ⇅", Binding = new Binding(nameof(OperatorGridRow.ActualMinutes)), SortMemberPath = nameof(OperatorGridRow.ActualMinutesValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "OEE ⇅", Binding = new Binding(nameof(OperatorGridRow.Oee)), SortMemberPath = nameof(OperatorGridRow.OeeValue), Width = new DataGridLength(88) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "产出贡献占比 ⇅", Binding = new Binding(nameof(OperatorGridRow.Contribution)), SortMemberPath = nameof(OperatorGridRow.ContributionValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvOperators.Columns.Add(CreateGridColumn("操作员  ↕", nameof(OperatorGridRow.OperatorName), nameof(OperatorGridRow.OperatorName), new DataGridLength(1, DataGridLengthUnitType.Star), false));
+        DgvOperators.Columns.Add(CreateGridColumn("有效工时(分)  ↕", nameof(OperatorGridRow.EffectiveMinutes), nameof(OperatorGridRow.EffectiveMinutesValue), new DataGridLength(1, DataGridLengthUnitType.Star), true));
+        DgvOperators.Columns.Add(CreateGridColumn("实际工时(分)  ↕", nameof(OperatorGridRow.ActualMinutes), nameof(OperatorGridRow.ActualMinutesValue), new DataGridLength(1, DataGridLengthUnitType.Star), true));
+        DgvOperators.Columns.Add(CreateGridColumn("OEE  ↕", nameof(OperatorGridRow.Oee), nameof(OperatorGridRow.OeeValue), new DataGridLength(88), true));
+        DgvOperators.Columns.Add(CreateGridColumn("产出贡献占比  ↕", nameof(OperatorGridRow.Contribution), nameof(OperatorGridRow.ContributionValue), new DataGridLength(1, DataGridLengthUnitType.Star), true));
 
         DgvMonths.Columns.Clear();
         DgvMonths.CanUserSortColumns = true;
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "月份 ⇅", Binding = new Binding(nameof(MonthGridRow.MonthKey)), SortMemberPath = nameof(MonthGridRow.MonthKey), Width = new DataGridLength(88) });
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "总有效工时(分) ⇅", Binding = new Binding(nameof(MonthGridRow.TotalEffective)), SortMemberPath = nameof(MonthGridRow.TotalEffectiveValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "总实际工时(分) ⇅", Binding = new Binding(nameof(MonthGridRow.TotalActual)), SortMemberPath = nameof(MonthGridRow.TotalActualValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "OEE ⇅", Binding = new Binding(nameof(MonthGridRow.Oee)), SortMemberPath = nameof(MonthGridRow.OeeValue), Width = new DataGridLength(88) });
+        DgvMonths.Columns.Add(CreateGridColumn("月份  ↕", nameof(MonthGridRow.MonthKey), nameof(MonthGridRow.MonthKey), new DataGridLength(100), false));
+        DgvMonths.Columns.Add(CreateGridColumn("总有效工时(分)  ↕", nameof(MonthGridRow.TotalEffective), nameof(MonthGridRow.TotalEffectiveValue), new DataGridLength(1, DataGridLengthUnitType.Star), true));
+        DgvMonths.Columns.Add(CreateGridColumn("总实际工时(分)  ↕", nameof(MonthGridRow.TotalActual), nameof(MonthGridRow.TotalActualValue), new DataGridLength(1, DataGridLengthUnitType.Star), true));
+        DgvMonths.Columns.Add(CreateGridColumn("OEE  ↕", nameof(MonthGridRow.Oee), nameof(MonthGridRow.OeeValue), new DataGridLength(100), true));
+    }
+
+    private static DataGridTextColumn CreateGridColumn(
+        string header,
+        string displayProperty,
+        string sortProperty,
+        DataGridLength width,
+        bool center)
+    {
+        var textStyle = new Style(typeof(TextBlock));
+        textStyle.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, System.Windows.VerticalAlignment.Center));
+        textStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty,
+            center ? System.Windows.TextAlignment.Center : System.Windows.TextAlignment.Left));
+
+        return new DataGridTextColumn
+        {
+            Header = header,
+            Binding = new Binding(displayProperty),
+            SortMemberPath = sortProperty,
+            Width = width,
+            ElementStyle = textStyle
+        };
     }
 
     private void RepopulateMonthUis(
@@ -206,6 +257,7 @@ public partial class MainWindow : Window
 
     private void ChkDarkMode_Changed(object sender, RoutedEventArgs e)
     {
+        if (_initializingUi) return;
         ApplyChrome();
         StyleDataGrid(DgvOperators);
         StyleDataGrid(DgvMonths);
@@ -220,7 +272,7 @@ public partial class MainWindow : Window
         var t = Theme;
         bool tech = IsTechChrome;
 
-        RootChrome.Background = tech ? new SolidColorBrush(Color.FromRgb(5, 8, 15)) : UiTheme.Solid(t.Bg);
+        RootChrome.Background = tech ? new SolidColorBrush(Color.FromRgb(7, 17, 29)) : UiTheme.Solid(t.Bg);
         Background = Brushes.Transparent;
         Foreground = UiTheme.Solid(t.TextPrimary);
         MainGrid.Background = Brushes.Transparent;
@@ -233,8 +285,8 @@ public partial class MainWindow : Window
                 StartPoint = new System.Windows.Point(0, 0),
                 EndPoint = new System.Windows.Point(1, 0.2)
             };
-            hdr.GradientStops.Add(new GradientStop(Color.FromRgb(10, 18, 36), 0));
-            hdr.GradientStops.Add(new GradientStop(Color.FromRgb(8, 14, 28), 1));
+            hdr.GradientStops.Add(new GradientStop(Color.FromRgb(10, 32, 51), 0));
+            hdr.GradientStops.Add(new GradientStop(Color.FromRgb(8, 22, 37), 1));
             PanelTop.Background = hdr;
             LblPath.Foreground = new SolidColorBrush(Color.FromRgb(148, 180, 200));
         }
@@ -282,21 +334,28 @@ public partial class MainWindow : Window
 
         if (tech && TryFindResource("TechCheckBox") is Style chkSt)
         {
-            ChkDarkMode.Style = chkSt;
             ChkBelowAvg.Style = chkSt;
         }
         else
         {
-            ChkDarkMode.Style = null;
             ChkBelowAvg.Style = null;
-            ChkDarkMode.Foreground = Brushes.White;
             ChkBelowAvg.Foreground = UiTheme.Solid(t.TextPrimary);
-            ChkDarkMode.Background = Brushes.Transparent;
         }
+        ChkDarkMode.Style = (Style)FindResource("DashboardThemeToggle");
 
         ApplyMonthPickerChrome(tech, t);
         ApplyChromeCards(tech, t);
         PlotMonth.Background = UiTheme.Solid(t.ChartSurface);
+        PlotMonth.Foreground = UiTheme.Solid(t.ChartLegendFg);
+        Resources["PlotTrackerBackgroundBrush"] = UiTheme.Solid(tech
+            ? Color.FromArgb(242, 11, 27, 43)
+            : Color.FromArgb(248, 255, 255, 255));
+        Resources["PlotTrackerBorderBrush"] = UiTheme.Solid(tech
+            ? Color.FromRgb(70, 130, 165)
+            : Color.FromRgb(148, 163, 184));
+        Resources["PlotTrackerTextBrush"] = UiTheme.Solid(tech
+            ? Color.FromRgb(232, 247, 255)
+            : Color.FromRgb(30, 41, 59));
     }
 
     /// <summary>图表统计月份多选区：背景与文字强对比（浅色主题下避免深色底+深色字）。</summary>
@@ -320,31 +379,13 @@ public partial class MainWindow : Window
 
     private void ApplyChromeButtons()
     {
-        bool tech = IsTechChrome;
-        var t = Theme;
-        foreach (var b in new[] { BtnSelectFiles, BtnExportOperatorChart, BtnExportMonthChart, BtnHistory, BtnExportPerfMonth })
-        {
-            bool primary = ReferenceEquals(b, BtnSelectFiles);
-            if (tech && TryFindResource("TechGlowButton") is Style st)
-            {
-                b.Style = st;
-                b.Background = UiTheme.Solid(primary ? t.Accent : Color.FromRgb(18, 32, 52));
-                b.Foreground = new SolidColorBrush(primary ? Color.FromRgb(7, 32, 45) : Color.FromRgb(226, 245, 255));
-                b.BorderBrush = UiTheme.Solid(primary ? t.Accent : Color.FromRgb(40, 62, 88));
-            }
-            else
-            {
-                b.Style = null;
-                b.Background = UiTheme.Solid(primary ? t.Accent : t.GridBg);
-                b.Foreground = UiTheme.Solid(primary ? Colors.White : t.TextPrimary);
-                b.BorderBrush = UiTheme.Solid(primary ? t.Accent : t.GridLine);
-            }
-
-            b.FontWeight = System.Windows.FontWeights.SemiBold;
-            b.Padding = new Thickness(14, 7, 14, 7);
-            b.Cursor = Cursors.Hand;
-            b.BorderThickness = new Thickness(primary ? 0 : 1);
-        }
+        var headerStyle = (Style)FindResource("DashboardHeaderButton");
+        BtnExportOperatorChart.Style = headerStyle;
+        BtnExportMonthChart.Style = headerStyle;
+        BtnHistory.Style = headerStyle;
+        BtnSelectFiles.Style = (Style)FindResource("DashboardPrimaryButton");
+        BtnExportPerfMonth.Style = (Style)FindResource("DashboardFilterButton");
+        TglChartMonths.Style = (Style)FindResource("DashboardFilterToggle");
     }
 
     private void ApplyChromeCards(bool tech, UiTheme t)
@@ -359,10 +400,29 @@ public partial class MainWindow : Window
             KpiCardOperators, KpiCardEffective, KpiCardActual, KpiCardOee
         };
 
-        if (tech && TryFindResource("TechCard") is Style cardSt)
+        if (tech)
         {
             foreach (var card in cards)
-                card.Style = cardSt;
+            {
+                card.Style = null;
+                card.Background = UiTheme.Solid(Color.FromRgb(11, 27, 43));
+                card.BorderBrush = UiTheme.Solid(Color.FromRgb(39, 70, 94));
+                card.BorderThickness = new Thickness(1);
+                card.CornerRadius = new CornerRadius(5);
+                card.Effect = null;
+            }
+
+            var kpiBrush = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(1, 1)
+            };
+            kpiBrush.GradientStops.Add(new GradientStop(Color.FromRgb(17, 39, 59), 0));
+            kpiBrush.GradientStops.Add(new GradientStop(Color.FromRgb(12, 30, 47), 1));
+            foreach (var card in new[] { KpiCardOperators, KpiCardEffective, KpiCardActual, KpiCardOee })
+                card.Background = kpiBrush;
+
+            PanelPerf.Background = UiTheme.Solid(Color.FromRgb(13, 34, 53));
         }
         else
         {
@@ -372,7 +432,7 @@ public partial class MainWindow : Window
                 card.Background = UiTheme.Solid(t.GridBg);
                 card.BorderBrush = UiTheme.Solid(t.GridLine);
                 card.BorderThickness = new Thickness(1);
-                card.CornerRadius = new CornerRadius(10);
+                card.CornerRadius = new CornerRadius(5);
                 card.Effect = null;
             }
         }
@@ -412,10 +472,11 @@ public partial class MainWindow : Window
         dg.HorizontalGridLinesBrush = UiTheme.Solid(t.GridLine);
         dg.RowBackground = UiTheme.Solid(t.GridBg);
         dg.AlternatingRowBackground = UiTheme.Solid(t.GridAlt);
+        dg.AlternationCount = 2;
         dg.Foreground = UiTheme.Solid(t.TextPrimary);
-        dg.VerticalGridLinesBrush = Brushes.Transparent;
-        dg.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
-        dg.RowHeight = 32;
+        dg.VerticalGridLinesBrush = IsTechChrome ? UiTheme.Solid(t.GridLine) : Brushes.Transparent;
+        dg.GridLinesVisibility = IsTechChrome ? DataGridGridLinesVisibility.All : DataGridGridLinesVisibility.Horizontal;
+        dg.RowHeight = 31;
         dg.ColumnHeaderHeight = 34;
         dg.CanUserResizeRows = false;
 
@@ -862,6 +923,34 @@ public partial class MainWindow : Window
         series.InterpolationAlgorithm = valid >= 3 ? InterpolationAlgorithms.CatmullRomSpline : null;
     }
 
+    private static void AddOeeValueLabel(
+        PlotModel model,
+        int monthIndex,
+        double value,
+        OxyColor textColor,
+        OxyColor surfaceColor,
+        bool placeAbove)
+    {
+        model.Annotations.Add(new TextAnnotation
+        {
+            XAxisKey = "MonthIndex",
+            YAxisKey = "Oee",
+            Text = value.ToString("P1", System.Globalization.CultureInfo.CurrentCulture),
+            TextPosition = new DataPoint(monthIndex, value),
+            Offset = new ScreenVector(0, placeAbove ? -15 : 15),
+            TextHorizontalAlignment = OxyPlot.HorizontalAlignment.Center,
+            TextVerticalAlignment = OxyPlot.VerticalAlignment.Middle,
+            TextColor = textColor,
+            Font = "Microsoft YaHei UI",
+            FontSize = 10.5,
+            FontWeight = 600,
+            Background = OxyColor.FromArgb(225, surfaceColor.R, surfaceColor.G, surfaceColor.B),
+            Stroke = OxyColor.FromArgb(105, textColor.R, textColor.G, textColor.B),
+            StrokeThickness = 1,
+            Padding = new OxyThickness(3, 1, 3, 1)
+        });
+    }
+
     private void BindMonthChart(
         IReadOnlyList<MonthStats> stats,
         IReadOnlyList<double?>? operatorTrend,
@@ -892,6 +981,7 @@ public partial class MainWindow : Window
             PlotAreaBackground = ToOxy(t.ChartSurface),
             PlotAreaBorderColor = ToOxy(t.ChartBorder),
             PlotAreaBorderThickness = new OxyThickness(1),
+            TextColor = ToOxy(t.ChartLegendFg),
             Title = chartTitle,
             TitleColor = ToOxy(t.ChartTitleFg),
             TitleFont = "Microsoft YaHei UI",
@@ -902,9 +992,9 @@ public partial class MainWindow : Window
         model.Legends.Add(new Legend
         {
             LegendPlacement = LegendPlacement.Outside,
-            LegendPosition = LegendPosition.BottomCenter,
+            LegendPosition = LegendPosition.TopRight,
             LegendOrientation = LegendOrientation.Horizontal,
-            LegendMargin = 8,
+            LegendMargin = 5,
             TextColor = ToOxy(t.ChartLegendFg)
         });
 
@@ -957,7 +1047,7 @@ public partial class MainWindow : Window
             TitleColor = ToOxy(t.ChartLineOee),
             MajorGridlineStyle = LineStyle.None,
             MinorGridlineStyle = LineStyle.None,
-            LabelFormatter = v => v.ToString("P2", System.Globalization.CultureInfo.CurrentCulture)
+            LabelFormatter = v => v.ToString("P0", System.Globalization.CultureInfo.CurrentCulture)
         };
 
         model.Axes.Add(xAxis);
@@ -965,7 +1055,15 @@ public partial class MainWindow : Window
         model.Axes.Add(yOee);
 
         const double barDx = 0.22;
-        const double barW = 0.38;
+        // LinearBarSeries.BarWidth 使用屏幕像素，而不是 X 轴的数据单位。
+        // 之前的 0.38 会被渲染成近似一条细线；根据月份数量适当收窄，兼顾稀疏和密集数据。
+        double barW = n switch
+        {
+            <= 6 => 22,
+            <= 12 => 16,
+            <= 18 => 11,
+            _ => 8
+        };
 
         var sEff = new LinearBarSeries
         {
@@ -992,6 +1090,7 @@ public partial class MainWindow : Window
         var sOee = new LineSeries
         {
             Title = "全员月度 OEE",
+            TrackerFormatString = "{0}\n{3}：{4:P1}",
             XAxisKey = xKey,
             YAxisKey = yOeeKey,
             Color = ToOxy(t.ChartLineOee),
@@ -1005,6 +1104,7 @@ public partial class MainWindow : Window
 
         double maxMinutes = 0;
         double maxOee = 0;
+        double minOee = double.MaxValue;
 
         if (stats.Count == 0)
         {
@@ -1025,6 +1125,7 @@ public partial class MainWindow : Window
                 {
                     sOee.Points.Add(new DataPoint(i, m.Oee.Value));
                     maxOee = Math.Max(maxOee, m.Oee.Value);
+                    minOee = Math.Min(minOee, m.Oee.Value);
                 }
                 else
                     sOee.Points.Add(DataPoint.Undefined);
@@ -1040,6 +1141,7 @@ public partial class MainWindow : Window
             sOpTrend = new LineSeries
             {
                 Title = operatorTrendTitle!.Trim(),
+                TrackerFormatString = "{0}\n{3}：{4:P1}",
                 XAxisKey = xKey,
                 YAxisKey = yOeeKey,
                 Color = ToOxy(opRgb),
@@ -1058,6 +1160,7 @@ public partial class MainWindow : Window
                 {
                     sOpTrend.Points.Add(new DataPoint(i, y.Value));
                     maxOee = Math.Max(maxOee, y.Value);
+                    minOee = Math.Min(minOee, y.Value);
                 }
                 else
                     sOpTrend.Points.Add(DataPoint.Undefined);
@@ -1067,7 +1170,40 @@ public partial class MainWindow : Window
         }
 
         yMinutes.Maximum = maxMinutes <= 0 ? double.NaN : maxMinutes * 1.15;
+        yOee.Minimum = minOee != double.MaxValue && minOee >= 0.5
+            ? Math.Max(0, Math.Floor((minOee - 0.05) * 10) / 10)
+            : 0;
         yOee.Maximum = maxOee <= 0 ? 1 : Math.Max(maxOee * 1.12, 1.02);
+
+        if (stats.Count > 0)
+        {
+            double labelCollisionDistance = (yOee.Maximum - yOee.Minimum) * 0.08;
+            OxyColor surfaceColor = ToOxy(t.ChartSurface);
+            OxyColor overallColor = ToOxy(t.ChartLineOee);
+            OxyColor operatorColor = ToOxy(Color.FromRgb(232, 121, 249));
+
+            for (int i = 0; i < stats.Count; i++)
+            {
+                double? overall = stats[i].Oee;
+                double? selectedOperator = showOperatorTrend ? operatorTrend![i] : null;
+                bool labelsAreClose = overall.HasValue
+                    && selectedOperator.HasValue
+                    && Math.Abs(overall.Value - selectedOperator.Value) <= labelCollisionDistance;
+
+                if (overall.HasValue)
+                {
+                    // 两条线靠近时，把数值分置在线条外侧，避免同月标签互相覆盖。
+                    bool placeAbove = !labelsAreClose || overall.Value >= selectedOperator!.Value;
+                    AddOeeValueLabel(model, i, overall.Value, overallColor, surfaceColor, placeAbove);
+                }
+
+                if (selectedOperator.HasValue)
+                {
+                    bool placeAbove = !labelsAreClose || selectedOperator.Value > overall!.Value;
+                    AddOeeValueLabel(model, i, selectedOperator.Value, operatorColor, surfaceColor, placeAbove);
+                }
+            }
+        }
 
         model.Series.Add(sEff);
         model.Series.Add(sAct);
@@ -1083,6 +1219,7 @@ public partial class MainWindow : Window
         model.Background = ToOxy(t.ChartSurface);
         model.PlotAreaBackground = ToOxy(t.ChartSurface);
         model.PlotAreaBorderColor = ToOxy(t.ChartBorder);
+        model.TextColor = ToOxy(t.ChartLegendFg);
         model.TitleColor = ToOxy(t.ChartTitleFg);
         foreach (var axis in model.Axes)
         {
@@ -1094,6 +1231,7 @@ public partial class MainWindow : Window
         }
         foreach (var leg in model.Legends)
             leg.TextColor = ToOxy(t.ChartLegendFg);
+        model.InvalidatePlot(false);
     }
 
     private void BtnExportOperatorChart_Click(object sender, RoutedEventArgs e)

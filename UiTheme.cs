@@ -128,8 +128,8 @@ internal sealed class UiTheme
         Color.FromRgb(12, 20, 36),
         Color.FromRgb(40, 62, 88),
         Color.FromRgb(10, 18, 34),
-        Color.FromRgb(34, 211, 238),
-        Color.FromRgb(8, 12, 22),
+        Color.FromRgb(19, 73, 111),
+        Color.FromRgb(235, 248, 255),
         Color.FromRgb(14, 24, 42),
         Color.FromRgb(18, 32, 52),
         Color.FromRgb(8, 14, 28),
@@ -138,10 +138,10 @@ internal sealed class UiTheme
         Color.FromRgb(160, 210, 230),
         Color.FromRgb(226, 245, 255),
         Color.FromRgb(190, 230, 255),
-        Color.FromRgb(34, 211, 238),
-        Color.FromRgb(167, 139, 250),
+        Color.FromRgb(66, 165, 255),
+        Color.FromRgb(67, 214, 181),
         Color.FromRgb(251, 191, 36),
-        Color.FromRgb(244, 114, 182),
+        Color.FromRgb(69, 229, 220),
         Color.FromRgb(165, 243, 252));
 
     public static SolidColorBrush Solid(Color c)

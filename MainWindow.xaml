@@ -5,12 +5,37 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:oxy="http://oxyplot.org/wpf"
         xmlns:local="clr-namespace:PerformanceCalculator2"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="生产绩效控制台" Height="900" Width="1440" MinWidth="1180" MinHeight="720"
         WindowStartupLocation="CenterScreen"
+        WindowStyle="None" ResizeMode="CanResize"
         FontFamily="Microsoft YaHei UI" FontSize="13"
         SnapsToDevicePixels="True">
   <Window.Resources>
+    <!-- OxyPlot 默认 Tracker 在深色主题下仍使用系统浅黄色背景，单独提供高对比模板。 -->
+    <SolidColorBrush x:Key="PlotTrackerBackgroundBrush" Color="#F20B1B2B"/>
+    <SolidColorBrush x:Key="PlotTrackerBorderBrush" Color="#668BC4E8"/>
+    <SolidColorBrush x:Key="PlotTrackerTextBrush" Color="#E8F7FF"/>
+    <ControlTemplate x:Key="PlotTrackerTemplate">
+      <oxy:TrackerControl Position="{Binding Position}"
+                          LineExtents="{Binding PlotModel.PlotArea}"
+                          ShowPointer="True"
+                          CornerRadius="5"
+                          Padding="8,5"
+                          Background="{DynamicResource PlotTrackerBackgroundBrush}"
+                          BorderBrush="{DynamicResource PlotTrackerBorderBrush}"
+                          BorderThickness="1"
+                          Foreground="{DynamicResource PlotTrackerTextBrush}"
+                          FontFamily="Microsoft YaHei UI"
+                          FontSize="12">
+        <TextBlock Text="{Binding Text}"
+                   Foreground="{DynamicResource PlotTrackerTextBrush}"
+                   TextWrapping="Wrap"
+                   MaxWidth="270"/>
+      </oxy:TrackerControl>
+    </ControlTemplate>
+
     <Storyboard x:Key="IntroStoryboard">
       <DoubleAnimation Storyboard.TargetName="RootDock" Storyboard.TargetProperty="Opacity"
                        From="0" To="1" Duration="0:0:0.45" FillBehavior="HoldEnd">
@@ -29,26 +54,117 @@
       <DoubleAnimation Storyboard.TargetName="DropScanLine" Storyboard.TargetProperty="Opacity"
                        From="0.2" To="1" Duration="0:0:0.55" AutoReverse="True"/>
     </Storyboard>
+
+    <Style x:Key="DashboardHeaderButton" TargetType="Button">
+      <Setter Property="Foreground" Value="#d9efff"/>
+      <Setter Property="Background" Value="#0d2236"/>
+      <Setter Property="BorderBrush" Value="#31516d"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="13,7"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#173550"/><Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#4f7898"/></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonBorder" Property="Background" Value="#092037"/></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="DashboardPrimaryButton" TargetType="Button" BasedOn="{StaticResource DashboardHeaderButton}">
+      <Setter Property="Background" Value="#1689ef"/>
+      <Setter Property="BorderBrush" Value="#1689ef"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style x:Key="DashboardFilterButton" TargetType="Button" BasedOn="{StaticResource DashboardHeaderButton}">
+      <Setter Property="Background" Value="#10263a"/>
+      <Setter Property="Padding" Value="12,5"/>
+    </Style>
+    <Style x:Key="DashboardFilterToggle" TargetType="ToggleButton">
+      <Setter Property="Foreground" Value="#c8e4f6"/>
+      <Setter Property="Background" Value="#10263a"/>
+      <Setter Property="BorderBrush" Value="#31516d"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="12,5"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="ToggleBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ToggleBorder" Property="Background" Value="#173550"/></Trigger>
+              <Trigger Property="IsChecked" Value="True"><Setter TargetName="ToggleBorder" Property="Background" Value="#16466a"/><Setter TargetName="ToggleBorder" Property="BorderBrush" Value="#42bff5"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="DashboardThemeToggle" TargetType="CheckBox">
+      <Setter Property="Width" Value="62"/>
+      <Setter Property="Height" Value="34"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="ToolTip" Value="切换浅色/深色"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <Border x:Name="Track" CornerRadius="17" Background="#10263a" BorderBrush="#31516d" BorderThickness="1">
+              <Grid Margin="4">
+                <TextBlock Text="☀" Foreground="#8da8bd" FontSize="13" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0"/>
+                <TextBlock Text="●" Foreground="#d7edff" FontSize="13" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <Ellipse x:Name="Knob" Width="23" Height="23" Fill="#f0f8ff" HorizontalAlignment="Left"/>
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True"><Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="Track" Property="Background" Value="#0a1d30"/><Setter TargetName="Track" Property="BorderBrush" Value="#4b6b86"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="WindowControlButton" TargetType="Button">
+      <Setter Property="Width" Value="45"/><Setter Property="Height" Value="28"/><Setter Property="Foreground" Value="#d9efff"/>
+      <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="ChromeBorder" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+        <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ChromeBorder" Property="Background" Value="#203b52"/></Trigger><Trigger Property="IsPressed" Value="True"><Setter TargetName="ChromeBorder" Property="Background" Value="#0a1e31"/></Trigger></ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
   </Window.Resources>
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="6" CornerRadius="0" GlassFrameThickness="0"/>
+  </shell:WindowChrome.WindowChrome>
   <Window.Triggers>
     <EventTrigger RoutedEvent="FrameworkElement.Loaded">
       <BeginStoryboard Storyboard="{StaticResource IntroStoryboard}"/>
     </EventTrigger>
   </Window.Triggers>
 
-  <Grid x:Name="RootChrome" Background="#05080f">
+  <Grid x:Name="RootChrome" Background="#07111d" AllowDrop="True"
+        PreviewDragOver="PanelDrop_PreviewDragOver" DragLeave="PanelDrop_DragLeave"
+        Drop="PanelDrop_Drop" PreviewDragEnter="PanelDrop_PreviewDragEnter">
     <!-- 深空渐变底 -->
     <Grid x:Name="TechBackdrop" Visibility="Visible">
       <Border>
         <Border.Background>
           <LinearGradientBrush StartPoint="0,0" EndPoint="1.1,1.2">
-            <GradientStop Color="#FF040a12" Offset="0"/>
-            <GradientStop Color="#FF0c1830" Offset="0.42"/>
-            <GradientStop Color="#FF051e24" Offset="1"/>
+            <GradientStop Color="#FF07111d" Offset="0"/>
+            <GradientStop Color="#FF0a1a2a" Offset="0.55"/>
+            <GradientStop Color="#FF071521" Offset="1"/>
           </LinearGradientBrush>
         </Border.Background>
       </Border>
-      <Border Opacity="0.35" IsHitTestVisible="False">
+      <Border Opacity="0.14" IsHitTestVisible="False">
         <Border.Background>
           <RadialGradientBrush Center="0.15,0" GradientOrigin="0.15,0" RadiusX="0.85" RadiusY="0.9">
             <GradientStop Color="#3322d3ee" Offset="0"/>
@@ -63,54 +179,60 @@
         <TranslateTransform x:Name="DockSlide"/>
       </DockPanel.RenderTransform>
 
-      <Border x:Name="PanelTop" DockPanel.Dock="Top" Padding="20,14,20,12" SnapsToDevicePixels="True">
+      <Border x:Name="PanelTop" DockPanel.Dock="Top" Padding="22,9,8,9" SnapsToDevicePixels="True">
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
           </Grid.RowDefinitions>
 
-          <Grid Grid.Row="0" Margin="0,0,0,10">
+          <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/>
               <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
-                <Border Width="38" Height="38" Margin="0,0,12,0" CornerRadius="10" Background="#22d3ee">
-                  <Viewbox Margin="9">
-                    <Grid Width="22" Height="22">
-                      <Rectangle Width="4" Height="9" Fill="#082f49" VerticalAlignment="Bottom" HorizontalAlignment="Left"/>
-                      <Rectangle Width="4" Height="15" Fill="#082f49" VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
-                      <Rectangle Width="4" Height="21" Fill="#082f49" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
-                    </Grid>
-                  </Viewbox>
-                </Border>
-                <TextBlock x:Name="LblTitle" Text="生产绩效控制台" FontSize="24" FontWeight="SemiBold" Foreground="#e0fbff" VerticalAlignment="Center"/>
-                <Border x:Name="BadgeLine" Margin="14,7,0,0" Padding="10,3" CornerRadius="6" VerticalAlignment="Center"
-                        BorderBrush="#5522d3ee" BorderThickness="1" Background="#1a2238">
-                  <TextBlock x:Name="LblBadge" Text="RP0 专线 · 本地持久化" FontSize="11" Foreground="#7dd3fc" Opacity="0.95"/>
-                </Border>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                        MouseLeftButtonDown="PanelTop_MouseLeftButtonDown">
+              <Viewbox Width="34" Height="34" Margin="0,0,12,0">
+                <Grid Width="28" Height="28">
+                  <Rectangle Width="5" Height="11" Fill="#31a8ef" VerticalAlignment="Bottom" HorizontalAlignment="Left"/>
+                  <Rectangle Width="5" Height="18" Fill="#50c7f1" VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
+                  <Rectangle Width="5" Height="26" Fill="#67e8e2" VerticalAlignment="Bottom" HorizontalAlignment="Right"/>
+                </Grid>
+              </Viewbox>
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="LblTitle" Text="生产绩效控制台" FontSize="25" FontWeight="SemiBold" Foreground="#e0fbff"/>
+                <TextBlock x:Name="LblPath" Text="尚未加载文件" Foreground="#829bb0" FontSize="10.5" MaxWidth="430" TextTrimming="CharacterEllipsis"/>
               </StackPanel>
-              <TextBlock x:Name="LblPath" Margin="50,5,0,0" Text="尚未加载文件" TextWrapping="Wrap"
-                         Foreground="#94a3b8" FontSize="12"/>
+              <Border x:Name="BadgeLine" Visibility="Collapsed"><TextBlock x:Name="LblBadge"/></Border>
             </StackPanel>
-            <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-              <Button x:Name="BtnExportOperatorChart" Content="导出操作员图" MinWidth="126" Height="36" Margin="0,0,8,0"
-                      Click="BtnExportOperatorChart_Click"/>
-              <Button x:Name="BtnExportMonthChart" Content="导出月度图" MinWidth="116" Height="36" Margin="0,0,8,0"
-                      Click="BtnExportMonthChart_Click"/>
-              <Button x:Name="BtnHistory" Content="数据源管理" MinWidth="116" Height="36" Margin="0,0,8,0" Click="BtnHistory_Click"/>
-              <CheckBox x:Name="ChkDarkMode" Content="深色" VerticalAlignment="Center" Margin="4,0,12,0"
-                        IsChecked="False" Checked="ChkDarkMode_Changed" Unchecked="ChkDarkMode_Changed"/>
-              <Button x:Name="BtnSelectFiles" Content="选择 Excel" MinWidth="128" Height="36" Click="BtnSelectFiles_Click"/>
+            <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+              <Button x:Name="BtnExportOperatorChart" Style="{StaticResource DashboardHeaderButton}" MinWidth="126" Height="38" Margin="0,0,10,0"
+                      Click="BtnExportOperatorChart_Click">
+                <StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE9D2;" FontSize="15" Margin="0,0,8,0"/><TextBlock Text="导出操作员图"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnExportMonthChart" Style="{StaticResource DashboardHeaderButton}" MinWidth="118" Height="38" Margin="0,0,10,0"
+                      Click="BtnExportMonthChart_Click">
+                <StackPanel Orientation="Horizontal"><TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE74E;" FontSize="15" Margin="0,0,8,0"/><TextBlock Text="导出月度图"/></StackPanel>
+              </Button>
+              <CheckBox x:Name="ChkDarkMode" Style="{StaticResource DashboardThemeToggle}" Margin="0,0,10,0"
+                        IsChecked="True" Checked="ChkDarkMode_Changed" Unchecked="ChkDarkMode_Changed"/>
+              <Button x:Name="BtnHistory" Style="{StaticResource DashboardHeaderButton}" MinWidth="118" Height="38" Margin="0,0,10,0" Click="BtnHistory_Click">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="▤" FontSize="15" Margin="0,0,8,0"/><TextBlock Text="数据源管理"/></StackPanel>
+              </Button>
+              <Button x:Name="BtnSelectFiles" Style="{StaticResource DashboardPrimaryButton}" MinWidth="124" Height="38" Click="BtnSelectFiles_Click">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="▰" FontSize="14" Margin="0,0,8,0"/><TextBlock Text="选择 Excel"/></StackPanel>
+              </Button>
             </WrapPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top" Margin="4,-8,0,0">
+              <Button Style="{StaticResource WindowControlButton}" Content="—" Click="BtnWindowMinimize_Click"/>
+              <Button Style="{StaticResource WindowControlButton}" Content="□" Click="BtnWindowMaximize_Click"/>
+              <Button x:Name="BtnWindowClose" Style="{StaticResource WindowControlButton}" Content="×" FontSize="16" Click="BtnWindowClose_Click"/>
+            </StackPanel>
           </Grid>
 
-          <Border x:Name="PanelDrop" Grid.Row="1" Height="42" CornerRadius="9" BorderThickness="1"
-                  AllowDrop="True" PreviewDragOver="PanelDrop_PreviewDragOver" DragLeave="PanelDrop_DragLeave"
-                  Drop="PanelDrop_Drop" PreviewDragEnter="PanelDrop_PreviewDragEnter">
+          <Border x:Name="PanelDrop" Visibility="Collapsed">
             <Grid>
               <TextBlock x:Name="LblDropHint" Text="拖放 .xlsx 到此处导入 · 每个 Excel 将作为独立数据源"
                          HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#7dd3fc" FontSize="12"/>
@@ -119,7 +241,7 @@
             </Grid>
           </Border>
 
-          <Border x:Name="PanelImportProgress" Grid.Row="2" Visibility="Collapsed" Margin="0,10,0,0" Padding="8,8"
+          <Border x:Name="PanelImportProgress" Grid.Row="1" Visibility="Collapsed" Margin="0,8,8,0" Padding="8,7"
                   CornerRadius="8" BorderThickness="1" BorderBrush="#4422d3ee" Background="#120f1c">
             <Grid>
               <Grid.RowDefinitions>
@@ -135,95 +257,88 @@
 
       <Grid x:Name="MainGrid" Margin="20,12,20,18">
         <Grid.RowDefinitions>
-          <RowDefinition Height="82"/>
-          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="98"/>
+          <RowDefinition Height="58"/>
           <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <UniformGrid Grid.Row="0" Columns="4" Margin="0,0,0,12">
-          <Border x:Name="KpiCardOperators" Margin="0,0,8,0" Padding="16,11" CornerRadius="10" BorderThickness="1">
+          <Border x:Name="KpiCardOperators" Margin="0,0,8,0" Padding="20,12" CornerRadius="5" BorderThickness="1">
             <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock x:Name="KpiCaptionOperators" Text="操作员人数" FontSize="12"/>
-                <TextBlock x:Name="LblKpiOperatorCount" Text="—" Margin="0,4,0,0" FontSize="24" FontWeight="SemiBold"/>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" FontFamily="Segoe MDL2 Assets" Text="&#xE716;" Foreground="#a9ddf9" FontSize="42" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="KpiCaptionOperators" Text="操作员人数" FontSize="14"/>
+                <StackPanel Orientation="Horizontal"><TextBlock x:Name="LblKpiOperatorCount" Text="—" Margin="0,2,8,0" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="人" Foreground="#bdd4e5" VerticalAlignment="Bottom" Margin="0,0,0,5"/></StackPanel>
               </StackPanel>
-              <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="#1822d3ee" VerticalAlignment="Center">
-                <TextBlock Text="人" Foreground="#22d3ee" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
             </Grid>
           </Border>
-          <Border x:Name="KpiCardEffective" Margin="4,0,4,0" Padding="16,11" CornerRadius="10" BorderThickness="1">
+          <Border x:Name="KpiCardEffective" Margin="4,0,4,0" Padding="20,12" CornerRadius="5" BorderThickness="1">
             <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock x:Name="KpiCaptionEffective" Text="总有效工时（分）" FontSize="12"/>
-                <TextBlock x:Name="LblKpiEffective" Text="—" Margin="0,4,0,0" FontSize="24" FontWeight="SemiBold"/>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" FontFamily="Segoe MDL2 Assets" Text="&#xE121;" Foreground="#a9ddf9" FontSize="42" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="KpiCaptionEffective" Text="总有效工时" FontSize="14"/>
+                <StackPanel Orientation="Horizontal"><TextBlock x:Name="LblKpiEffective" Text="—" Margin="0,2,8,0" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="分钟" Foreground="#bdd4e5" VerticalAlignment="Bottom" Margin="0,0,0,5"/></StackPanel>
               </StackPanel>
-              <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="#1822d3ee" VerticalAlignment="Center">
-                <TextBlock Text="效" Foreground="#22d3ee" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
             </Grid>
           </Border>
-          <Border x:Name="KpiCardActual" Margin="4,0,4,0" Padding="16,11" CornerRadius="10" BorderThickness="1">
+          <Border x:Name="KpiCardActual" Margin="4,0,4,0" Padding="20,12" CornerRadius="5" BorderThickness="1">
             <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock x:Name="KpiCaptionActual" Text="总实际工时（分）" FontSize="12"/>
-                <TextBlock x:Name="LblKpiActual" Text="—" Margin="0,4,0,0" FontSize="24" FontWeight="SemiBold"/>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" FontFamily="Segoe MDL2 Assets" Text="&#xE713;" Foreground="#a9ddf9" FontSize="42" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="KpiCaptionActual" Text="总实际工时" FontSize="14"/>
+                <StackPanel Orientation="Horizontal"><TextBlock x:Name="LblKpiActual" Text="—" Margin="0,2,8,0" FontSize="27" FontWeight="SemiBold"/><TextBlock Text="分钟" Foreground="#bdd4e5" VerticalAlignment="Bottom" Margin="0,0,0,5"/></StackPanel>
               </StackPanel>
-              <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="#1822d3ee" VerticalAlignment="Center">
-                <TextBlock Text="实" Foreground="#22d3ee" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
             </Grid>
           </Border>
-          <Border x:Name="KpiCardOee" Margin="8,0,0,0" Padding="16,11" CornerRadius="10" BorderThickness="1">
+          <Border x:Name="KpiCardOee" Margin="8,0,0,0" Padding="20,12" CornerRadius="5" BorderThickness="1">
             <Grid>
-              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock x:Name="KpiCaptionOee" Text="整体 OEE" FontSize="12"/>
-                <TextBlock x:Name="LblKpiOee" Text="—" Margin="0,4,0,0" FontSize="24" FontWeight="SemiBold"/>
+              <Grid.ColumnDefinitions><ColumnDefinition Width="68"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" FontFamily="Segoe MDL2 Assets" Text="&#xE9D2;" Foreground="#a9ddf9" FontSize="42" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock x:Name="KpiCaptionOee" Text="整体 OEE" FontSize="14"/>
+                <TextBlock x:Name="LblKpiOee" Text="—" Margin="0,2,0,0" FontSize="27" FontWeight="SemiBold"/>
               </StackPanel>
-              <Border Grid.Column="1" Width="34" Height="34" CornerRadius="17" Background="#1822d3ee" VerticalAlignment="Center">
-                <TextBlock Text="%" Foreground="#22d3ee" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
             </Grid>
           </Border>
         </UniformGrid>
 
-        <Border x:Name="PanelPerf" Grid.Row="1" Margin="0,0,0,12" Padding="14,10" CornerRadius="10" BorderThickness="1">
+        <Border x:Name="PanelPerf" Grid.Row="1" Margin="0,0,0,10" Padding="16,8" CornerRadius="5" BorderThickness="1">
           <Grid>
-            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-            <WrapPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-              <TextBlock x:Name="LblPerfMonthCaption" Text="绩效表月份" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold"/>
-              <ComboBox x:Name="CboPerfMonth" Width="126" Margin="0,0,14,0" VerticalAlignment="Center"
-                        SelectionChanged="CboPerfMonth_SelectionChanged"/>
-              <TextBlock x:Name="LblAvgEffective" Text="平均有效工时：—" VerticalAlignment="Center" Margin="0,0,14,0" MinWidth="220"/>
-              <CheckBox x:Name="ChkBelowAvg" Content="仅显示低于平均有效工时" VerticalAlignment="Center" Margin="0,0,14,0"
-                        Checked="ChkBelowAvg_Changed" Unchecked="ChkBelowAvg_Changed"/>
-              <Button x:Name="BtnExportPerfMonth" Content="导出当月绩效表" Padding="14,6" Click="BtnExportPerfMonth_Click"/>
-            </WrapPanel>
-            <Grid Grid.Row="1" Margin="0,9,0,0">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <TextBlock x:Name="LblChartMonthHint" Text="图表统计月份" VerticalAlignment="Top" Margin="0,5,12,0" FontSize="12" FontWeight="SemiBold"/>
-              <Border x:Name="BdChartMonthPicker" Grid.Column="1" CornerRadius="7" Padding="8,4" BorderThickness="1" MaxHeight="66">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                  <ItemsControl x:Name="ChartMonthItemsControl">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate><WrapPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="{x:Type local:SelectableMonth}">
-                        <CheckBox Margin="0,2,16,2" Content="{Binding MonthKey}"
-                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                  IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                  Checked="ChartMonthCheck_Changed" Unchecked="ChartMonthCheck_Changed"/>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="LblPerfMonthCaption" Grid.Column="0" Text="绩效表月份" VerticalAlignment="Center" Margin="0,0,10,0" FontWeight="SemiBold"/>
+            <ComboBox x:Name="CboPerfMonth" Grid.Column="1" Width="150" Height="34" Margin="0,0,24,0" VerticalAlignment="Center"
+                      SelectionChanged="CboPerfMonth_SelectionChanged"/>
+            <TextBlock x:Name="LblAvgEffective" Grid.Column="2" Text="平均有效工时：—" VerticalAlignment="Center" Margin="0,0,24,0" MinWidth="250"/>
+            <CheckBox x:Name="ChkBelowAvg" Grid.Column="3" Content="仅显示低于平均有效工时" VerticalAlignment="Center" Margin="0,0,16,0"
+                      Checked="ChkBelowAvg_Changed" Unchecked="ChkBelowAvg_Changed"/>
+            <ToggleButton x:Name="TglChartMonths" Grid.Column="5" Content="图表月份" Style="{StaticResource DashboardFilterToggle}" Margin="0,0,8,0"/>
+            <Button x:Name="BtnExportPerfMonth" Grid.Column="6" Content="导出绩效表" Style="{StaticResource DashboardFilterButton}" Click="BtnExportPerfMonth_Click"/>
+            <Popup PlacementTarget="{Binding ElementName=TglChartMonths}" Placement="Bottom" StaysOpen="False"
+                   IsOpen="{Binding IsChecked, ElementName=TglChartMonths, Mode=TwoWay}" AllowsTransparency="True">
+              <Border x:Name="BdChartMonthPicker" Width="300" MaxHeight="280" Margin="0,6,0,0" CornerRadius="6" Padding="12" BorderThickness="1">
+                <StackPanel>
+                  <TextBlock x:Name="LblChartMonthHint" Text="图表统计月份（可多选）" Margin="0,0,0,8" FontSize="12" FontWeight="SemiBold"/>
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="ChartMonthItemsControl">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:SelectableMonth}">
+                          <CheckBox Margin="0,4" Content="{Binding MonthKey}"
+                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                    IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                    Checked="ChartMonthCheck_Changed" Unchecked="ChartMonthCheck_Changed"/>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
               </Border>
-            </Grid>
+            </Popup>
           </Grid>
         </Border>
 
@@ -231,19 +346,19 @@
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1.08*"/></Grid.ColumnDefinitions>
           <Grid x:Name="CardLeft" Grid.Column="0" Margin="0,0,6,0">
             <Grid.RowDefinitions><RowDefinition Height="1.45*"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border x:Name="CardOperatorTable" Grid.Row="0" Margin="0,0,0,6" CornerRadius="10" BorderThickness="1" Padding="0">
+            <Border x:Name="CardOperatorTable" Grid.Row="0" Margin="0,0,0,6" CornerRadius="5" BorderThickness="1" Padding="0">
               <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <TextBlock x:Name="LblOperatorTableTitle" Text="操作员绩效" Margin="14,0" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold"/>
+                <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <TextBlock x:Name="LblOperatorTableTitle" Text="操作员绩效" Margin="14,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold"/>
                 <DataGrid x:Name="DgvOperators" Grid.Row="1" IsReadOnly="True" AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" SelectionUnit="FullRow"
                           HeadersVisibility="Column"/>
               </Grid>
             </Border>
-            <Border x:Name="CardMonthTable" Grid.Row="1" Margin="0,6,0,0" CornerRadius="10" BorderThickness="1" Padding="0">
+            <Border x:Name="CardMonthTable" Grid.Row="1" Margin="0,6,0,0" CornerRadius="5" BorderThickness="1" Padding="0">
               <Grid>
-                <Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <TextBlock x:Name="LblMonthTableTitle" Text="月度统计" Margin="14,0" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold"/>
+                <Grid.RowDefinitions><RowDefinition Height="42"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <TextBlock x:Name="LblMonthTableTitle" Text="月度统计" Margin="14,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold"/>
                 <DataGrid x:Name="DgvMonths" Grid.Row="1" IsReadOnly="True" AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" HeadersVisibility="Column"/>
               </Grid>
@@ -252,11 +367,11 @@
 
           <Grid x:Name="CardRight" Grid.Column="1" Margin="6,0,0,0">
             <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Border x:Name="CardOperatorChart" Grid.Row="0" Margin="0,0,0,6" CornerRadius="10" BorderThickness="1" Padding="4">
+            <Border x:Name="CardOperatorChart" Grid.Row="0" Margin="0,0,0,6" CornerRadius="5" BorderThickness="1" Padding="4">
               <local:OperatorOeeControl x:Name="OperatorOeeChart"/>
             </Border>
-            <Border x:Name="CardMonthChart" Grid.Row="1" Margin="0,6,0,0" CornerRadius="10" BorderThickness="1" Padding="2">
-              <oxy:PlotView x:Name="PlotMonth"/>
+            <Border x:Name="CardMonthChart" Grid.Row="1" Margin="0,6,0,0" CornerRadius="5" BorderThickness="1" Padding="2">
+              <oxy:PlotView x:Name="PlotMonth" DefaultTrackerTemplate="{StaticResource PlotTrackerTemplate}"/>
             </Border>
           </Grid>
         </Grid>
