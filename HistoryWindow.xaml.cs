@@ -10,7 +10,7 @@ namespace PerformanceCalculator2;
 public partial class HistoryWindow : Window
 {
     private readonly HistoryRepository _repo;
-    private readonly ObservableCollection<BatchRowVm> _rows = new();
+    private readonly ObservableCollection<DataSourceRowVm> _rows = new();
 
     public HistoryWindow(HistoryRepository repo)
     {
@@ -41,6 +41,8 @@ public partial class HistoryWindow : Window
         headerStyle.Setters.Add(new Setter(ForegroundProperty, UiTheme.Solid(t.TextPrimary)));
         headerStyle.Setters.Add(new Setter(FontWeightProperty, FontWeights.SemiBold));
         headerStyle.Setters.Add(new Setter(PaddingProperty, new Thickness(8, 6, 8, 6)));
+        headerStyle.Setters.Add(new Setter(CursorProperty, System.Windows.Input.Cursors.Hand));
+        headerStyle.Setters.Add(new Setter(ToolTipProperty, "点击按此列排序"));
         dg.ColumnHeaderStyle = headerStyle;
 
         var cellStyle = new Style(typeof(DataGridCell));
@@ -58,48 +60,52 @@ public partial class HistoryWindow : Window
     private void ReloadList()
     {
         _rows.Clear();
-        foreach (var b in _repo.ListBatches())
+        foreach (var b in _repo.ListDataSources())
         {
             var local = b.CreatedUtc.ToLocalTime();
-            _rows.Add(new BatchRowVm
+            _rows.Add(new DataSourceRowVm
             {
                 Id = b.Id,
-                CreatedLocal = local.ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture),
+                CreatedLocalValue = local,
                 MonthKey = b.MonthKey,
-                RowCount = b.RowCount.ToString(CultureInfo.InvariantCulture),
-                SourceFiles = b.SourceFiles ?? ""
+                RowCountValue = b.RowCount,
+                SourceFile = b.SourceFile ?? ""
             });
         }
     }
 
     private void BtnDelete_Click(object sender, RoutedEventArgs e)
     {
-        var sel = GridBatches.SelectedItems.Cast<BatchRowVm>().ToList();
+        // 提交当前单元格的编辑，确保刚点击的复选框值已写回 ViewModel。
+        GridBatches.CommitEdit(DataGridEditingUnit.Cell, true);
+        GridBatches.CommitEdit(DataGridEditingUnit.Row, true);
+        var sel = _rows.Where(r => r.IsSelected).ToList();
         if (sel.Count == 0)
         {
-            MessageBox.Show(this, "请先选择要删除的批次。", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "请先勾选要删除的数据源。", Title, MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        if (MessageBox.Show(this, $"确定删除选中的 {sel.Count} 个导入批次？此操作不可恢复。", "确认删除",
+        if (MessageBox.Show(this, $"确定删除已勾选的 {sel.Count} 个数据源？对应绩效明细也会被删除，此操作不可恢复。", "确认删除",
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
-        foreach (var r in sel)
-            _repo.DeleteBatch(r.Id);
+        _repo.DeleteDataSources(sel.Select(r => r.Id));
 
         ReloadList();
-        DialogResult = true;
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
 
-    public sealed class BatchRowVm
+    public sealed class DataSourceRowVm
     {
         public long Id { get; init; }
-        public string CreatedLocal { get; init; } = "";
+        public bool IsSelected { get; set; }
+        public DateTime CreatedLocalValue { get; init; }
+        public string CreatedLocal => CreatedLocalValue.ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
         public string MonthKey { get; init; } = "";
-        public string RowCount { get; init; } = "";
-        public string SourceFiles { get; init; } = "";
+        public int RowCountValue { get; init; }
+        public string RowCount => RowCountValue.ToString(CultureInfo.InvariantCulture);
+        public string SourceFile { get; init; } = "";
     }
 }

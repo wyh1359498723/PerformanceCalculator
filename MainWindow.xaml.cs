@@ -95,17 +95,19 @@ public partial class MainWindow : Window
     private void SetupDataGrids()
     {
         DgvOperators.Columns.Clear();
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "操作员", Binding = new Binding(nameof(OperatorGridRow.OperatorName)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "有效工时(分)", Binding = new Binding(nameof(OperatorGridRow.EffectiveMinutes)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "实际工时(分)", Binding = new Binding(nameof(OperatorGridRow.ActualMinutes)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "OEE", Binding = new Binding(nameof(OperatorGridRow.Oee)), Width = new DataGridLength(80) });
-        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "产出贡献占比", Binding = new Binding(nameof(OperatorGridRow.Contribution)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvOperators.CanUserSortColumns = true;
+        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "操作员 ⇅", Binding = new Binding(nameof(OperatorGridRow.OperatorName)), SortMemberPath = nameof(OperatorGridRow.OperatorName), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "有效工时(分) ⇅", Binding = new Binding(nameof(OperatorGridRow.EffectiveMinutes)), SortMemberPath = nameof(OperatorGridRow.EffectiveMinutesValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "实际工时(分) ⇅", Binding = new Binding(nameof(OperatorGridRow.ActualMinutes)), SortMemberPath = nameof(OperatorGridRow.ActualMinutesValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "OEE ⇅", Binding = new Binding(nameof(OperatorGridRow.Oee)), SortMemberPath = nameof(OperatorGridRow.OeeValue), Width = new DataGridLength(88) });
+        DgvOperators.Columns.Add(new DataGridTextColumn { Header = "产出贡献占比 ⇅", Binding = new Binding(nameof(OperatorGridRow.Contribution)), SortMemberPath = nameof(OperatorGridRow.ContributionValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
 
         DgvMonths.Columns.Clear();
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "月份", Binding = new Binding(nameof(MonthGridRow.MonthKey)), Width = new DataGridLength(80) });
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "总有效工时(分)", Binding = new Binding(nameof(MonthGridRow.TotalEffective)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "总实际工时(分)", Binding = new Binding(nameof(MonthGridRow.TotalActual)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "OEE", Binding = new Binding(nameof(MonthGridRow.Oee)), Width = new DataGridLength(80) });
+        DgvMonths.CanUserSortColumns = true;
+        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "月份 ⇅", Binding = new Binding(nameof(MonthGridRow.MonthKey)), SortMemberPath = nameof(MonthGridRow.MonthKey), Width = new DataGridLength(88) });
+        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "总有效工时(分) ⇅", Binding = new Binding(nameof(MonthGridRow.TotalEffective)), SortMemberPath = nameof(MonthGridRow.TotalEffectiveValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "总实际工时(分) ⇅", Binding = new Binding(nameof(MonthGridRow.TotalActual)), SortMemberPath = nameof(MonthGridRow.TotalActualValue), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        DgvMonths.Columns.Add(new DataGridTextColumn { Header = "OEE ⇅", Binding = new Binding(nameof(MonthGridRow.Oee)), SortMemberPath = nameof(MonthGridRow.OeeValue), Width = new DataGridLength(88) });
     }
 
     private void RepopulateMonthUis(bool selectLatestTableMonth)
@@ -373,6 +375,8 @@ public partial class MainWindow : Window
         headerStyle.Setters.Add(new Setter(ForegroundProperty, UiTheme.Solid(t.TextPrimary)));
         headerStyle.Setters.Add(new Setter(FontWeightProperty, System.Windows.FontWeights.Bold));
         headerStyle.Setters.Add(new Setter(PaddingProperty, new Thickness(8, 6, 8, 6)));
+        headerStyle.Setters.Add(new Setter(CursorProperty, Cursors.Hand));
+        headerStyle.Setters.Add(new Setter(ToolTipProperty, "点击按此列排序"));
         dg.ColumnHeaderStyle = headerStyle;
 
         var cellStyle = new Style(typeof(DataGridCell));
@@ -457,7 +461,7 @@ public partial class MainWindow : Window
         BtnHistory.IsEnabled = !busy;
     }
 
-    private static (List<TestRecord> merged, List<string> errors, Exception? insertEx) ImportExcelFilesCore(
+    private static (List<TestRecord> importedRows, int importedSources, List<string> errors, Exception? insertEx) ImportExcelFilesCore(
         string[] pathsCopy,
         HistoryRepository repo,
         IProgress<(int Percent, string Message)>? phaseProgress)
@@ -469,13 +473,14 @@ public partial class MainWindow : Window
             phaseProgress?.Report((p, msg));
         }
 
-        var merged = new List<TestRecord>();
+        var importedRows = new List<TestRecord>();
+        var sources = new List<(string Path, IReadOnlyList<TestRecord> Rows)>();
         var errors = new List<string>();
         int nFiles = pathsCopy.Length;
         if (nFiles == 0)
         {
             Report(0, "未选择文件");
-            return (merged, errors, null);
+            return (importedRows, 0, errors, null);
         }
 
         for (int fi = 0; fi < nFiles; fi++)
@@ -486,49 +491,77 @@ public partial class MainWindow : Window
             try
             {
                 if (!File.Exists(path))
+                {
+                    errors.Add($"{Path.GetFileName(path)}：文件不存在");
                     continue;
+                }
                 var part = ExcelPerformanceReader.ReadWorkbook(path);
-                merged.AddRange(part);
+                if (part.Count == 0)
+                {
+                    errors.Add($"{Path.GetFileName(path)}：未读取到有效的 RP0 数据");
+                    continue;
+                }
+                sources.Add((path, part));
             }
             catch (Exception ex)
             {
-                errors.Add($"{Path.GetFileName(path)}: {ex.Message}");
+                errors.Add($"{Path.GetFileName(path)}：读取失败：{ex.Message}");
             }
         }
 
-        if (merged.Count == 0)
+        if (sources.Count == 0)
         {
             Report(0, errors.Count > 0 ? "未能读取到有效数据" : "未选择有效文件");
-            return (merged, errors, null);
+            return (importedRows, 0, errors, null);
         }
 
-        IProgress<(int current, int total)>? rowProgress = null;
-        if (phaseProgress != null)
+        int totalRows = sources.Sum(s => s.Rows.Count);
+        int processedRows = 0;
+        int importedSources = 0;
+        Exception? firstInsertException = null;
+
+        for (int si = 0; si < sources.Count; si++)
         {
-            rowProgress = new Progress<(int current, int total)>(t =>
+            var source = sources[si];
+            string sourceName = Path.GetFileName(source.Path);
+            int sourceNumber = si + 1;
+            int sourceBase = processedRows;
+            IProgress<(int current, int total)>? rowProgress = null;
+            if (phaseProgress != null)
             {
-                int n = t.total;
-                int c = t.current;
-                int p = n <= 0 ? 40 : (int)(40 + 59.0 * c / n);
-                if (p > 99) p = 99;
-                phaseProgress.Report((p, $"【写库】{c:N0} / {n:N0} 条"));
-            });
+                rowProgress = new Progress<(int current, int total)>(t =>
+                {
+                    int currentTotal = sourceBase + t.current;
+                    int p = totalRows <= 0 ? 40 : (int)(40 + 59.0 * currentTotal / totalRows);
+                    if (p > 99) p = 99;
+                    phaseProgress.Report((p,
+                        $"【写入数据源】({sourceNumber}/{sources.Count}) {sourceName} · {currentTotal:N0}/{totalRows:N0} 条"));
+                });
+            }
+
+            try
+            {
+                repo.InsertDataSource(source.Rows, sourceName, rowProgress);
+                importedRows.AddRange(source.Rows);
+                importedSources++;
+            }
+            catch (Exception ex)
+            {
+                firstInsertException ??= ex;
+                errors.Add($"{sourceName}：写入失败：{ex.Message}");
+            }
+            finally
+            {
+                processedRows += source.Rows.Count;
+            }
         }
 
-        try
-        {
-            repo.InsertImport(
-                merged,
-                string.Join("; ", pathsCopy.Select(Path.GetFileName)),
-                rowProgress);
-            Report(100, $"【写库】完成，共 {merged.Count:N0} 条");
-            return (merged, errors, null);
-        }
-        catch (Exception ex)
-        {
-            Report(0, "写入数据库失败");
-            return (merged, errors, ex);
-        }
+        if (importedSources > 0)
+            Report(100, $"【写入数据源】完成，共 {importedSources} 个数据源、{importedRows.Count:N0} 条记录");
+        else
+            Report(0, "数据源写入失败");
+
+        return (importedRows, importedSources, errors, importedSources == 0 ? firstInsertException : null);
     }
 
     private sealed class RefreshBindModel
@@ -612,7 +645,7 @@ public partial class MainWindow : Window
     {
         if (paths == null || paths.Length == 0) return;
 
-        var pathsCopy = paths.ToArray();
+        var pathsCopy = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         Mouse.OverrideCursor = Cursors.Wait;
         SetImportUiBusy(true);
 
@@ -644,28 +677,26 @@ public partial class MainWindow : Window
         try
         {
             var repo = _repo;
-            var (merged, errors, insertEx) = await Task.Run(() => ImportExcelFilesCore(pathsCopy, repo, phaseProgress)).ConfigureAwait(true);
+            var (importedRows, importedSources, errors, insertEx) = await Task.Run(() => ImportExcelFilesCore(pathsCopy, repo, phaseProgress)).ConfigureAwait(true);
 
-            if (merged.Count == 0)
+            if (importedRows.Count == 0)
             {
-                LblPath.Text = errors.Count > 0 ? "未能读取有效数据" : "未选择有效文件";
-                if (errors.Count > 0)
-                    MessageBox.Show(this, string.Join(Environment.NewLine, errors), "读取失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                bool writeFailed = insertEx != null;
+                LblPath.Text = writeFailed ? "数据源写入失败" : "未能读取有效数据";
+                string detail = errors.Count > 0
+                    ? string.Join(Environment.NewLine, errors)
+                    : insertEx?.Message ?? "未选择有效文件";
+                MessageBox.Show(this, detail, writeFailed ? "写入失败" : "读取失败", MessageBoxButton.OK,
+                    writeFailed ? MessageBoxImage.Error : MessageBoxImage.Warning);
                 return;
             }
 
-            if (insertEx != null)
-            {
-                MessageBox.Show(this, "写入本地数据库失败：" + insertEx.Message, Title, MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            LblPath.Text = pathsCopy.Length == 1
-                ? $"{pathsCopy[0]}  ·  已写入本地库 {merged.Count} 条"
-                : $"已合并 {pathsCopy.Length} 个文件，写入本地库 {merged.Count} 条";
+            LblPath.Text = importedSources == 1 && pathsCopy.Length == 1
+                ? $"{pathsCopy[0]}  ·  已作为独立数据源写入 {importedRows.Count} 条"
+                : $"已导入 {importedSources} 个独立数据源，共写入 {importedRows.Count} 条";
 
             if (errors.Count > 0)
-                MessageBox.Show(this, string.Join(Environment.NewLine, errors), "部分文件读取失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, string.Join(Environment.NewLine, errors), "部分数据源导入失败", MessageBoxButton.OK, MessageBoxImage.Warning);
 
             RepopulateMonthUis(selectLatestTableMonth: true);
 
@@ -722,6 +753,10 @@ public partial class MainWindow : Window
                 _operatorRows.Add(new OperatorGridRow
                 {
                     OperatorName = r.OperatorName,
+                    EffectiveMinutesValue = r.EffectiveMinutes,
+                    ActualMinutesValue = r.ActualMinutes,
+                    OeeValue = r.Oee,
+                    ContributionValue = r.ContributionRatio,
                     EffectiveMinutes = PerformanceAggregator.FormatMinutes(r.EffectiveMinutes),
                     ActualMinutes = PerformanceAggregator.FormatMinutes(r.ActualMinutes),
                     Oee = PerformanceAggregator.FormatOee(r.Oee),
@@ -743,6 +778,9 @@ public partial class MainWindow : Window
             _monthRows.Add(new MonthGridRow
             {
                 MonthKey = r.MonthKey,
+                TotalEffectiveValue = r.TotalEffectiveMinutes,
+                TotalActualValue = r.TotalActualMinutes,
+                OeeValue = r.Oee,
                 TotalEffective = PerformanceAggregator.FormatMinutes(r.TotalEffectiveMinutes),
                 TotalActual = PerformanceAggregator.FormatMinutes(r.TotalActualMinutes),
                 Oee = PerformanceAggregator.FormatOee(r.Oee)

@@ -6,7 +6,7 @@ using Microsoft.Data.Sqlite;
 
 namespace PerformanceCalculator2;
 
-/// <summary>SQLite 持久化：按导入批次存储绩效明细。</summary>
+/// <summary>SQLite 持久化：每个 Excel 数据源对应一个批次，删除数据源时级联删除其绩效明细。</summary>
 public sealed class HistoryRepository
 {
     private readonly string _connectionString;
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_perf_batch ON perf_records(batch_id);
             .First().Key;
     }
 
-    public long InsertImport(IReadOnlyList<TestRecord> rows, string sourceFiles, IProgress<(int current, int total)>? rowProgress = null)
+    public long InsertDataSource(IReadOnlyList<TestRecord> rows, string sourceFile, IProgress<(int current, int total)>? rowProgress = null)
     {
         if (rows == null || rows.Count == 0) throw new ArgumentException("无数据可保存", nameof(rows));
         string monthKey = ResolvePrimaryMonthKey(rows);
@@ -91,7 +91,7 @@ CREATE INDEX IF NOT EXISTS idx_perf_batch ON perf_records(batch_id);
             cmd.CommandText = "INSERT INTO import_batches (created_utc, month_key, source_files) VALUES ($c,$m,$s);";
             cmd.Parameters.AddWithValue("$c", DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture));
             cmd.Parameters.AddWithValue("$m", monthKey);
-            cmd.Parameters.AddWithValue("$s", sourceFiles ?? "");
+            cmd.Parameters.AddWithValue("$s", sourceFile ?? "");
             cmd.ExecuteNonQuery();
             cmd.Parameters.Clear();
             cmd.CommandText = "SELECT last_insert_rowid();";
@@ -140,9 +140,9 @@ CREATE INDEX IF NOT EXISTS idx_perf_batch ON perf_records(batch_id);
         return batchId;
     }
 
-    public IReadOnlyList<ImportBatchInfo> ListBatches()
+    public IReadOnlyList<DataSourceInfo> ListDataSources()
     {
-        var list = new List<ImportBatchInfo>();
+        var list = new List<DataSourceInfo>();
         using var cn = Open();
         OpenAndConfigure(cn);
         using var cmd = cn.CreateCommand();
@@ -154,26 +154,38 @@ ORDER BY b.id DESC;";
         using var rd = cmd.ExecuteReader();
         while (rd.Read())
         {
-            list.Add(new ImportBatchInfo
+            list.Add(new DataSourceInfo
             {
                 Id = rd.GetInt64(0),
                 CreatedUtc = DateTime.Parse(rd.GetString(1), null, DateTimeStyles.RoundtripKind),
                 MonthKey = rd.IsDBNull(2) ? "" : rd.GetString(2),
-                SourceFiles = rd.IsDBNull(3) ? "" : rd.GetString(3),
+                SourceFile = rd.IsDBNull(3) ? "" : rd.GetString(3),
                 RowCount = rd.GetInt32(4)
             });
         }
         return list;
     }
 
-    public void DeleteBatch(long batchId)
+    public void DeleteDataSources(IEnumerable<long> sourceIds)
     {
+        var ids = sourceIds.Distinct().ToList();
+        if (ids.Count == 0) return;
+
         using var cn = Open();
         OpenAndConfigure(cn);
+        using var tx = cn.BeginTransaction();
         using var cmd = cn.CreateCommand();
-        cmd.CommandText = "DELETE FROM import_batches WHERE id = $id;";
-        cmd.Parameters.AddWithValue("$id", batchId);
+        cmd.Transaction = tx;
+        var names = new List<string>(ids.Count);
+        for (int i = 0; i < ids.Count; i++)
+        {
+            string name = "$id" + i;
+            names.Add(name);
+            cmd.Parameters.AddWithValue(name, ids[i]);
+        }
+        cmd.CommandText = $"DELETE FROM import_batches WHERE id IN ({string.Join(',', names)});";
         cmd.ExecuteNonQuery();
+        tx.Commit();
     }
 
     public IReadOnlyList<string> ListDistinctMonths()
